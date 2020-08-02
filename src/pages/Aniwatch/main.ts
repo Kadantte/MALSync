@@ -1,84 +1,128 @@
-import { pageInterface } from "./../pageInterface";
+import { pageInterface } from '../pageInterface';
 
-var tabPage;
+let tabPage;
 
 export const Aniwatch: pageInterface = {
-  name: "Aniwatch",
-  domain: "https://aniwatch.me",
+  name: 'Aniwatch',
+  domain: 'https://aniwatch.me',
   database: 'Aniwatch',
-  type: "anime",
-  isSyncPage: function(url) {
-    if (tabPage === "stream") {
+  languages: ['English', 'German'],
+  type: 'anime',
+  isSyncPage(url) {
+    if (tabPage === 'stream' || tabPage === 'w2g') {
       return true;
-    } else {
-      return false;
     }
+    return false;
   },
   sync: {
-    getTitle: function(url){return j.$("h1.md-headline.no-margin > span.border-right.pr-5").text()},
-    getIdentifier: function(url) {
-      return url.split("/")[4];
+    getTitle(url) {
+      if (tabPage === 'stream') {
+        return j.$('h1.md-headline.no-margin > span.border-right.pr-5').text();
+      }
+      return j.$('h2.md-title > span.border-right > a').text();
     },
-    getOverviewUrl: function(url){
-      return Aniwatch.domain +"/anime/" + Aniwatch.sync.getIdentifier(url);
+    getIdentifier(url) {
+      if (tabPage === 'stream') {
+        return url.split('/')[4];
+      }
+
+      const anchorHref = j.$('h2.md-title > span.border-right > a').attr('href');
+
+      if (!anchorHref) return '';
+
+      return anchorHref.split('/')[2];
     },
-    getEpisode: function(url){
-      return parseInt(utils.urlPart(url, 5));
+    getOverviewUrl(url) {
+      return `${Aniwatch.domain}/anime/${Aniwatch.sync.getIdentifier(url)}`;
     },
-    nextEpUrl: function(url){
-      if (!j.$('#anilyr-nextEpi').is('[disabled=disabled]')) {
-        return url.replace(/\d+$/, (parseInt(utils.urlPart(url, 5)) + 1));
-      };
+    getEpisode(url) {
+      if (tabPage === 'stream') {
+        return parseInt(utils.urlPart(url, 5));
+      }
+      return Number(
+        j
+          .$('h2.md-title > span.desc-color')
+          .text()
+          .replace(/\D+/g, ''),
+      );
+    },
+    nextEpUrl(url) {
+      if (tabPage !== 'stream' || !j.$('#anilyr-nextEpi').is('[disabled=disabled]')) return '';
+
+      const urlPart5 = utils.urlPart(url, 5);
+
+      if (!urlPart5) return '';
+
+      return url.replace(/\d+$/, String(parseInt(urlPart5) + 1));
     },
   },
-  overview:{
-    getTitle: function(url){
-      return j.$("md-content > div > div.responsive-anime.anime-boxes-margin > h1").text();
+  overview: {
+    getTitle(url) {
+      return j.$('md-content > div > div.responsive-anime.anime-boxes-margin > h1').text();
     },
-    getIdentifier: function(url){
+    getIdentifier(url) {
       return utils.urlPart(url, 4);
     },
-    uiSelector: function(selector){
-      selector.insertBefore(j.$("#enable-ani-cm > div > section.section-padding > div > md-content > div > div > md-content > div").first());
+    uiSelector(selector) {
+      j.$('#enable-ani-cm > div > section.section-padding > div > md-content > div > div > md-content > div')
+        .first()
+        .before(j.html(selector));
     },
   },
-  init(page){
-    if(document.title == "Just a moment..."){
-      con.log("loading");
-      page.cdn();
-      return;
-    }
+  init(page) {
     api.storage.addStyle(require('!to-string-loader!css-loader!less-loader!./style.less').toString());
 
     utils.changeDetect(loaded, () => {
-      return window.location.href +"/"+ j.$(".md-tab.md-active").text();
-    })
+      if (window.location.href.split('/')[3] === 'watch2gether') {
+        return (
+          window.location.href +
+          j.$('h2.md-title > span.border-right > a').text() +
+          j
+            .$('h2.md-title > span.desc-color')
+            .text()
+            .replace(/\D+/g, '')
+        );
+      }
+      return `${window.location.href}/${j.$('.md-tab.md-active').text()}`;
+    });
     loaded();
-    $(document).on("keydown", function(e) {
-      if ((e.which || e.keyCode) == 116) {
+    $(document).on('keydown', function(e) {
+      if ((e.which || e.keyCode) === 116) {
         loaded();
       }
     });
     function loaded() {
-      $('#flashinfo-div, #flash-div-bottom, #flash-div-top, #malp').remove();
-      page.url = window.location.href;
-      page.UILoaded = false;
-      tabPage = j.$(".md-tab.md-active").text().toLowerCase();
-      if(page.url.split("/")[3] === "anime" && typeof tabPage !== "undefined" && (tabPage === "stream" || tabPage === "overview")) {
-        utils.waitUntilTrue(
-          function() {
-            if (j.$("md-content > div > div.responsive-anime.anime-boxes-margin > h1").text() || j.$("h1.md-headline.no-margin > span.border-right.pr-5").text()){
-              return true;
-            } else {
+      page.reset();
+      if (page.url.split('/')[3] === 'anime') {
+        tabPage = j
+          .$('.md-tab.md-active')
+          .text()
+          .toLowerCase();
+        if (typeof tabPage !== 'undefined' && (tabPage === 'stream' || tabPage === 'overview')) {
+          utils.waitUntilTrue(
+            function() {
+              if (
+                j.$('md-content > div > div.responsive-anime.anime-boxes-margin > h1').text().length ||
+                j.$('h1.md-headline.no-margin > span.border-right.pr-5').text().length
+              ) {
+                return true;
+              }
               return false;
-            }
-          },
-          function() {
-            console.log("pagehandle")
-            page.handlePage();
-          }
+            },
+            function() {
+              console.log('pagehandle');
+              page.handlePage();
+            },
           );
+        }
+      } else if (
+        page.url.split('/')[3] === 'watch2gether' &&
+        j.$('h2.md-title > span.border-right > a').text() &&
+        j.$('h2.md-title > span.desc-color').text()
+      ) {
+        tabPage = 'w2g';
+        page.handlePage();
       }
     }
-  }
+  },
 };

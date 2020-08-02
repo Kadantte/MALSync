@@ -520,7 +520,7 @@
     "description": "Thumbnails"
   },
   "settings_Thumbnails_text": {
-    "message": "De optie van het vergroten of verkleinen van de thumbnails van MAL. <br> Zoals thumbnails van karakters, mensen, aanbevelingen, etc.",
+    "message": "De optie van het vergroten of verkleinen van de thumbnails van MAL. Zoals thumbnails van karakters, mensen, aanbevelingen, etc.",
     "description": "Thumbnails - Text"
   },
   "settings_Thumbnails_Large": {
@@ -551,10 +551,6 @@
     "message": "Gebruik notities",
     "description": "Use Tags/Notes"
   },
-  "settings_malTags_Text": {
-    "message": "Als het aan staat: Op je MAL Anime Lijst en de bladwijzer op miniMAL, zal een icoon-link worden toegevoegd op de laatst gebruikte streaming site die je gebruikte om de anime te bekijken.<br>Klik dan simpelweg de icoon om de anime verder te kijken.",
-    "description": "Use Tags/Notes - Text"
-  },
   "settings_malContinue": {
     "message": "Bevorder kijk links",
     "description": "Continue watching links"
@@ -562,10 +558,6 @@
   "settings_malResume": {
     "message": "Hervat kijk links",
     "description": "Resume watching links"
-  },
-  "settings_miniMAL_floatButtonStealth": {
-    "message": "Verborgen menu knop",
-    "description": "Stealth floating menu button"
   },
   "settings_miniMAL_floatButtonHide": {
     "message": "Verberg miniMAL menu knop",
@@ -780,7 +772,7 @@
     "description": "How to use description text",
     "placeholders": {
       "Link1": {
-        "content": "<a target=\"_blank\" href=\"https://github.com/lolamtisch/MALSync#supported-pages-\">",
+        "content": "<a target=\"_blank\" href=\"https://github.com/MALSync/MALSync#supported-pages-\">",
         "example": "<a>"
       },
       "LinkEnd1": {

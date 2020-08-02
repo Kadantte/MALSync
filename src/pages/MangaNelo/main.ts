@@ -1,68 +1,83 @@
-import { pageInterface } from "./../pageInterface";
+import { pageInterface } from '../pageInterface';
 
 export const MangaNelo: pageInterface = {
-  name: "MangaNelo",
-  domain: "https://manganelo.com",
+  name: 'MangaNelo',
+  domain: 'https://manganelo.com',
   database: 'MangaNelo',
-  type: "manga",
-  isSyncPage: function(url) {
-    if (url.split("/")[3] === "chapter") {
+  languages: ['English'],
+  type: 'manga',
+  isSyncPage(url) {
+    if (url.split('/')[3] === 'chapter') {
       return true;
-    } else {
-      return false;
     }
+    return false;
   },
   sync: {
-    getTitle: function(url){
-      return j.$("div.rdfa-breadcrumb > div > p > span:nth-child(4) > a > span").text()
+    getTitle(url) {
+      return j.$('div.body-site > div > div.panel-breadcrumb > a:nth-child(3)').text();
     },
-    getIdentifier: function(url) {
+    getIdentifier(url) {
       return utils.urlPart(url, 4);
     },
-    getOverviewUrl: function(url){
-      return j.$("div.rdfa-breadcrumb > div > p > span:nth-child(4) > a").attr("href");
+    getOverviewUrl(url) {
+      return j.$('div.body-site > div > div.panel-breadcrumb > a:nth-child(3)').attr('href') || '';
     },
-    getEpisode: function(url){
-      return url.split("/")[5].match(/\d+/gmi);
+    getEpisode(url) {
+      return Number(url.split('/')[5].match(/\d+/gim));
     },
-     nextEpUrl: function(url){return j.$('div.btn-navigation-chap > a.back').first().attr('href');
+    nextEpUrl(url) {
+      return j
+        .$('div.panel-navigation > div > a.navi-change-chapter-btn-next.a-h')
+        .first()
+        .attr('href');
     },
   },
-  overview:{
-    getTitle: function(url){
-      return j.$("div.rdfa-breadcrumb > div > p > span:nth-child(4) > a > span").text();
+  overview: {
+    getTitle(url) {
+      return j.$('div.panel-story-info > div.story-info-right > h1').text();
     },
-    getIdentifier: function(url){
+    getIdentifier(url) {
       return utils.urlPart(url, 4);
     },
-    uiSelector: function(selector){
-      j.$('<div id="malthing"> <p id="malp">'+selector.html()+'</p></div>').insertBefore(j.$("#chapter").first());
+    uiSelector(selector) {
+      j.$('div.panel-story-chapter-list')
+        .first()
+        .before(
+          j.html(
+            `<div id="malthing" class="panel-story-chapter-list"> <p class="row-title-chapter" style="width: 100%;"><span class="row-title-chapter-name">MAL-Sync</span></p> <div class="panel-story-info-description" style="border-top: 0;margin-top: 0;">${selector}</div></div>`,
+          ),
+        );
     },
 
-    list:{
+    list: {
       offsetHandler: false,
-      elementsSelector: function(){
-        return j.$("div.row:not('div.title-list-chapter')");
+      elementsSelector() {
+        return j.$('div.panel-story-chapter-list > ul.row-content-chapter > li.a-h');
       },
-      elementUrl: function(selector){
-        return selector.find('span:nth-child(1) > a').first().attr('href');
+      elementUrl(selector) {
+        return (
+          selector
+            .find('a')
+            .first()
+            .attr('href') || ''
+        );
       },
-      elementEp: function(selector){
-        return selector.find('span:nth-child(1) > a').first().attr('href').split("/")[5].match(/\d+/gmi);
-      }
-    }
+      elementEp(selector) {
+        return selector
+          .find('a')
+          .first()
+          .attr('href')
+          .split('/')[5]
+          .match(/\d+/gim);
+      },
+    },
   },
-  init(page){
-    if(document.title == "Just a moment..."){
-      con.log("loading");
-      page.cdn();
-      return;
-    }
+  init(page) {
     api.storage.addStyle(require('!to-string-loader!css-loader!less-loader!./style.less').toString());
-    j.$(document).ready(function(){
-      if (page.url.split("/")[3] === "chapter" || page.url.split("/")[3] === "manga") {
+    j.$(document).ready(function() {
+      if (page.url.split('/')[3] === 'chapter' || page.url.split('/')[3] === 'manga') {
         page.handlePage();
       }
     });
-  }
+  },
 };

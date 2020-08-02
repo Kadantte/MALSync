@@ -1,52 +1,99 @@
-import {pageInterface} from "./../pageInterface";
+import { pageInterface } from '../pageInterface';
 
 export const Voiranime: pageInterface = {
-    name: 'Voiranime',
-    domain: 'http://voiranime.com',
-    type: 'anime',
-    isSyncPage: function(url){
-      if($('.video-series-wrap').length) return true;
-      return false;
+  name: 'Voiranime',
+  domain: 'http://voiranime.com',
+  languages: ['French'],
+  type: 'anime',
+  isSyncPage(url) {
+    if ($('.video-series-wrap').length) return true;
+    return false;
+  },
+  sync: {
+    getTitle(url) {
+      return $('h1')
+        .first()
+        .text()
+        .trim()
+        .split(' – ')[0];
     },
-    sync:{
-      getTitle: function(url){return $('h1').first().text().trim().split(' – ')[0];},
-      getIdentifier: function(url){return utils.urlPart(url, 3).replace(/(-saison-[^-]*)?-[^-]*-[^-]*$/i, '');},
-      getOverviewUrl: function(url){
-        return Voiranime.domain+'/'+Voiranime.sync.getIdentifier(url);
-      },
-      getEpisode: function(url){
-        return parseInt($('.series-current').first().text().trim());
-      },
-      nextEpUrl: function(url){return utils.absoluteLink(j.$('.series-current').first().closest('li').next().find('a').attr('href'), Voiranime.domain);},
+    getIdentifier(url) {
+      const urlPart3 = utils.urlPart(url, 3);
+
+      if (!urlPart3 || urlPart3.length === 0) return '';
+
+      return urlPart3.replace(/(-saison-[^-]*)?-[^-]*-[^-]*$/i, '');
     },
-    overview:{
-      getTitle: function(url){return $('h1').first().text().trim();},
-      getIdentifier: function(url){return utils.urlPart(url, 3);},
-      uiSelector: function(selector){ selector.insertAfter(j.$("h1").first()); },
-    list:{
+    getOverviewUrl(url) {
+      return `${Voiranime.domain}/${Voiranime.sync.getIdentifier(url)}`;
+    },
+    getEpisode(url) {
+      return parseInt(
+        $('.series-current')
+          .first()
+          .text()
+          .trim(),
+      );
+    },
+    nextEpUrl(url) {
+      return utils.absoluteLink(
+        j
+          .$('.series-current')
+          .first()
+          .closest('li')
+          .next()
+          .find('a')
+          .attr('href'),
+        Voiranime.domain,
+      );
+    },
+  },
+  overview: {
+    getTitle(url) {
+      return $('h1')
+        .first()
+        .text()
+        .trim();
+    },
+    getIdentifier(url) {
+      return utils.urlPart(url, 3) || '';
+    },
+    uiSelector(selector) {
+      j.$('h1')
+        .first()
+        .after(j.html(selector));
+    },
+    list: {
       offsetHandler: false,
-      elementsSelector: function(){
-        return j.$("ul.video-series-list > li:not(.series-title)");
+      elementsSelector() {
+        return j.$('ul.video-series-list > li:not(.series-title)');
       },
-      elementUrl: function(selector){
-        return utils.absoluteLink(selector.find('a').first().attr('href'),Voiranime.domain);
+      elementUrl(selector) {
+        return utils.absoluteLink(
+          selector
+            .find('a')
+            .first()
+            .attr('href'),
+          Voiranime.domain,
+        );
       },
-      elementEp: function(selector){
-        return selector.find('a').first().text().replace(/\D+/,"");
-      }
-    }
+      elementEp(selector) {
+        return Number(
+          selector
+            .find('a')
+            .first()
+            .text()
+            .replace(/\D+/, ''),
+        );
+      },
     },
-    init(page){
-      if(document.title == "Just a moment..."){
-          con.log("loading");
-          page.cdn();
-          return;
+  },
+  init(page) {
+    api.storage.addStyle(require('!to-string-loader!css-loader!less-loader!./style.less').toString());
+    j.$(document).ready(function() {
+      if ($('.video-series-wrap').length || $('.category-anime-serie').length) {
+        page.handlePage();
       }
-      api.storage.addStyle(require('!to-string-loader!css-loader!less-loader!./style.less').toString());
-      j.$(document).ready(function(){
-        if($('.video-series-wrap').length || $('.category-anime-serie').length){
-          page.handlePage();
-        }
-      });
-    }
+    });
+  },
 };

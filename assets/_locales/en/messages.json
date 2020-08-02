@@ -99,6 +99,14 @@
       "message": "Plan to Read",
       "description": "Plan to Read"
     },
+    "UI_Status_Rewatching_anime": {
+      "message": "Rewatching",
+      "description": "Status to rewatch anime"
+    },
+    "UI_Status_Rewatching_manga": {
+      "message": "Rereading",
+      "description": "Status to reread manga"
+    },
     "UI_Episode": {
       "message": "Episode:",
       "description": "Episode"
@@ -217,9 +225,25 @@
       "message": "Start watching?",
       "description": "Start watching anime message"
     },
+    "syncPage_flashConfirm_rewatch_finish_anime": {
+      "message": "Finish rewatching?",
+      "description": "Finish rewatching anime message"
+    },
+    "syncPage_flashConfirm_rewatch_finish_manga": {
+      "message": "Finish rereading?",
+      "description": "Finish rereading manga message"
+    },
     "syncPage_flashConfirm_start_manga": {
       "message": "Start reading?",
       "description": "Start reading manga message"
+    },
+    "syncPage_flashConfirm_rewatch_start_anime": {
+      "message": "Rewatch Anime?",
+      "description": "Start rewatching anime message"
+    },
+    "syncPage_flashConfirm_rewatch_start_manga": {
+      "message": "Reread Manga?",
+      "description": "Start rereading manga message"
     },
     "syncPage_flashConfirm_Anime_Correct": {
       "message": "Is \"$anime$\" correct?",
@@ -295,6 +319,14 @@
       "message": "Credentials wrong",
       "description": "Credentials wrong"
     },
+    "bookmarksItem_Years": {
+      "message": "Years",
+      "description": "Years"
+    },
+    "bookmarksItem_Year": {
+      "message": "Year",
+      "description": "Year"
+    },
     "bookmarksItem_Days": {
       "message": "Days",
       "description": "Days"
@@ -314,6 +346,32 @@
     "bookmarksItem_mins": {
       "message": "mins",
       "description": "mins"
+    },
+    "bookmarksItem_min": {
+      "message": "min",
+      "description": "min"
+    },
+    "bookmarksItem_secs": {
+      "message": "seconds",
+      "description": "seconds"
+    },
+    "bookmarksItem_sec": {
+      "message": "second",
+      "description": "second"
+    },
+    "bookmarksItem_now": {
+      "message": "Now",
+      "description": "Now"
+    },
+    "bookmarksItem_ago":{
+      "message": "$time$ ago",
+      "description": "Text for time in the past",
+      "placeholders": {
+        "time": {
+          "content": "$1",
+          "example": "2 days 1 hour"
+        }
+      }
     },
     "prediction_Episode":{
       "message": "Next episode estimated in $time$",
@@ -390,6 +448,10 @@
     "correction_NewUrlReset": {
       "message": "MyAnimeList URL reset",
       "description": "URL reset"
+    },
+    "correction_DBRequest": {
+      "message": "Submit database correction request?",
+      "description": "Popup that shows up when the user corrects an anime and asks if this change should be sent to the dabase for correction"
     },
     "overview_Continue_anime": {
       "message": "Continue watching",
@@ -512,7 +574,7 @@
       "description": "Streaming Site Links"
     },
     "settings_StreamingSite_text": {
-      "message": "If disabled, the streaming site will no longer appear in an animes sidebar on MyAnimeList/AniList/Kitsu.",
+      "message": "If disabled, the streaming site will no longer appear in an anime’s sidebar on MyAnimeList/AniList/Kitsu/Simkl.",
       "description": "Streaming Site Links - Text"
     },
     "settings_Thumbnails": {
@@ -520,7 +582,7 @@
       "description": "Thumbnails"
     },
     "settings_Thumbnails_text": {
-      "message": "The option is for resizing the thumbnails on MyAnimeList.<br>Like thumbnails for characters, people, recommendations, etc.",
+      "message": "The option is for resizing the thumbnails on MyAnimeList eg. thumbnails for characters, people, recommendations, etc.",
       "description": "Thumbnails - Text"
     },
     "settings_Thumbnails_Large": {
@@ -552,7 +614,7 @@
       "description": "Use Tags/Notes"
     },
     "settings_malTags_Text": {
-      "message": "If enabled: On your MyAnimeList/Anilist Anime List and the bookmark list in miniMAL, an icon-link will be added to the last used streaming site you were using to watch an anime.<br>Simply click the icon to continue watching the anime.",
+      "message": "If enabled: The streaming page that you have used last is permanently (across browsers) saved in the tags/Notes section in your list. The saved string in the tag section is ugly, only really recommended if you dont use the tag/notes section.",
       "description": "Use Tags/Notes - Text"
     },
     "settings_malContinue": {
@@ -563,9 +625,21 @@
       "message": "Resume watching links",
       "description": "Resume watching links"
     },
+    "settings_usedPage": {
+      "message": "Last used page links",
+      "description": "Last used page links"
+    },
     "settings_miniMAL_floatButtonStealth": {
-      "message": "Stealth floating menu button",
-      "description": "Stealth floating menu button"
+      "message": "Stealth UI mode",
+      "description": "Stealth UI mode. Lowers the visibility of some malSync UI elements"
+    },
+    "settings_miniMAL_minimizeBigPopup": {
+      "message": "Minimize big pop-ups",
+      "description": "Shows an 'action required' popup hidding big popups"
+    },
+    "settings_miniMAL_floatButtonCorrection": {
+      "message": "Remap floating button to the correction UI",
+      "description": "Remap floating button to the correction UI"
     },
     "settings_miniMAL_floatButtonHide": {
       "message": "Hide miniMAL floating menu button",
@@ -624,7 +698,22 @@
       "message": "Auto resume",
       "description": "Auto resume video where you left off toggle"
     },
-
+    "settings_autoNextEp": {
+      "message": "Autoplay next episode",
+      "description": "Autoplays the next episode after the video ends"
+    },
+    "settings_Shortcuts_Correction": {
+      "message": "Open anime relation correction popup",
+      "description": "Text for the correction ui shortcut"
+    },
+    "settings_Shortcuts_Sync": {
+      "message": "Set episode/chapter as read",
+      "description": "Text for the sync ui shortcut"
+    },
+    "settings_Shortcuts_Next_Episode": {
+      "message": "Open next episode shortcut",
+      "description": "Description for the next episode shortcut option"
+    },
     "settings_Shortcuts_Skip_Forward": {
       "message": "Skips the opening",
       "description": "Description for the the opening skip shortcut"
@@ -632,6 +721,10 @@
     "settings_Shortcuts_Skip_Backward": {
       "message": "Jump back to opening's beginning",
       "description": "Description for the the opening skip shortcut"
+    },
+    "settings_Shortcuts_Click": {
+      "message": "Click to enter shortcut",
+      "description": "Shown if no shortcut is set for an option"
     },
     "settings_introSkip": {
       "message": "Set opening skip length ($Seconds$ seconds)",
@@ -798,7 +891,7 @@
       "description": "How to use description text",
       "placeholders": {
         "Link1": {
-          "content": "<a target=\"_blank\" href=\"https://github.com/lolamtisch/MALSync#supported-pages-\">",
+          "content": "<a target=\"_blank\" href=\"https://github.com/MALSync/MALSync#supported-pages-\">",
           "example": "<a>"
         },
         "LinkEnd1": {
@@ -874,5 +967,13 @@
           "example": "Mangadex"
         }
       }
+    },
+    "nextEpShort_no_support": {
+      "message": "This page doesn't support opening the next episode",
+      "description": "Error message if the page does not support opening the next episode after pressing the shortcut"
+    },
+    "nextEpShort_no_nextEp": {
+      "message": "Couldn't find the next episode",
+      "description": "Error message if no next episode could be found after pressing the next episode shortcut"
     }
 }

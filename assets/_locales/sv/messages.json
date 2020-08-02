@@ -516,7 +516,7 @@
     "description": "Thumbnails"
   },
   "settings_Thumbnails_text": {
-    "message": "Alternativet är för att ändra storlek på miniatyrbilder på MyAnimeList.<br>Som miniatyrbilder för karaktärer, personer, rekommendationer, etc.",
+    "message": "Alternativet är för att ändra storlek på miniatyrbilder på MyAnimeList. Som miniatyrbilder för karaktärer, personer, rekommendationer, etc.",
     "description": "Thumbnails - Text"
   },
   "settings_Thumbnails_Large": {
@@ -547,10 +547,6 @@
     "message": "Använd Taggar/Anteckningar",
     "description": "Use Tags/Notes"
   },
-  "settings_malTags_Text": {
-    "message": "Vid aktivering så kommer det att läggas en ikon-länk till den streaming sida du senast använde för att titta på en anime, vid din anime lista på MyAnimeList/AniList och i miniMAL.<br>Klicka bara på ikonen för att fortsätta titta på animen.",
-    "description": "Use Tags/Notes - Text"
-  },
   "settings_malContinue": {
     "message": "Länkar för att fortsätta titta på episoder",
     "description": "Continue watching links"
@@ -558,10 +554,6 @@
   "settings_malResume": {
     "message": "Länkar för att återuppta episoden",
     "description": "Resume watching links"
-  },
-  "settings_miniMAL_floatButtonStealth": {
-    "message": "Stealth flytande menyknapp",
-    "description": "Stealth floating menu button"
   },
   "settings_miniMAL_floatButtonHide": {
     "message": "Göm miniMAL flytande menyknapp",
@@ -776,7 +768,7 @@
     "description": "How to use description text",
     "placeholders": {
       "Link1": {
-        "content": "<a target=\"_blank\" href=\"https://github.com/lolamtisch/MALSync#supported-pages-\">",
+        "content": "<a target=\"_blank\" href=\"https://github.com/MALSync/MALSync#supported-pages-\">",
         "example": "<a>"
       },
       "LinkEnd1": {

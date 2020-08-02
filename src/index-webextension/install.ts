@@ -1,24 +1,25 @@
 import Vue from 'vue';
-import main from './../installPage/main.vue';
+import VueDOMPurifyHTML from 'vue-dompurify-html';
+import main from '../installPage/main.vue';
 
-declare var componentHandler: any;
+Vue.use(VueDOMPurifyHTML);
 
-document.getElementsByTagName('head')[0].onclick = function(e){
-  try{
+declare let componentHandler: any;
+
+document.getElementsByTagName('head')[0].onclick = function(e) {
+  try {
     componentHandler.upgradeDom();
-  }catch(e){
-    console.log(e);
-    setTimeout(function(){
+  } catch (e2) {
+    console.log(e2);
+    setTimeout(function() {
       componentHandler.upgradeDom();
-    },500);
+    }, 500);
   }
-}
+};
 
-api.settings.init()
-  .then(()=>{
-    var minimalVue = new Vue({
-      render: h => h(main)
-    }).$mount('#app')
-  })
-
-
+api.settings.init().then(() => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const minimalVue = new Vue({
+    render: h => h(main),
+  }).$mount('#app');
+});

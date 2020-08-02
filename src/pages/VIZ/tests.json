@@ -1,0 +1,18 @@
+{
+  "title": "viz",
+  "url": "https://www.viz.com/",
+  "offline": true,
+  "skip": true,
+  "testCases": [
+    {
+      // overview
+      "url": "https://www.viz.com/shonenjump/chapters/one-piece",
+      "expected": {
+        "sync": false,
+        "title": "One Piece",
+        "identifier": "one-piece",
+        "uiSelector": true
+      }
+    }
+  ]
+}

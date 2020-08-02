@@ -99,6 +99,14 @@
     "message": "Geplant",
     "description": "Plan to Read"
   },
+  "UI_Status_Rewatching_anime": {
+    "message": "Erneutes ansehen",
+    "description": "Status to rewatch anime"
+  },
+  "UI_Status_Rewatching_manga": {
+    "message": "Erneutes lesen",
+    "description": "Status to reread manga"
+  },
   "UI_Episode": {
     "message": "Episode:",
     "description": "Episode"
@@ -217,9 +225,25 @@
     "message": "Anfangen zu schauen?",
     "description": "Start watching anime message"
   },
+  "syncPage_flashConfirm_rewatch_finish_anime": {
+    "message": "Als Abgeschlossen setzen?",
+    "description": "Finish rewatching anime message"
+  },
+  "syncPage_flashConfirm_rewatch_finish_manga": {
+    "message": "Als Abgeschlossen setzen?",
+    "description": "Finish rereading manga message"
+  },
   "syncPage_flashConfirm_start_manga": {
     "message": "Anfangen zu lesen?",
     "description": "Start reading manga message"
+  },
+  "syncPage_flashConfirm_rewatch_start_anime": {
+    "message": "Anime erneut ansehen?",
+    "description": "Start rewatching anime message"
+  },
+  "syncPage_flashConfirm_rewatch_start_manga": {
+    "message": "Manga erneut lesen?",
+    "description": "Start rereading manga message"
   },
   "syncPage_flashConfirm_Anime_Correct": {
     "message": "Ist \"$anime$\" korrekt?",
@@ -295,6 +319,14 @@
     "message": "Zugangsdaten falsch",
     "description": "Credentials wrong"
   },
+  "bookmarksItem_Years": {
+    "message": "Jahre",
+    "description": "Years"
+  },
+  "bookmarksItem_Year": {
+    "message": "Jahr",
+    "description": "Year"
+  },
   "bookmarksItem_Days": {
     "message": "Tage",
     "description": "Days"
@@ -314,6 +346,32 @@
   "bookmarksItem_mins": {
     "message": "mins",
     "description": "mins"
+  },
+  "bookmarksItem_min": {
+    "message": "min",
+    "description": "min"
+  },
+  "bookmarksItem_secs": {
+    "message": "sekunden",
+    "description": "seconds"
+  },
+  "bookmarksItem_sec": {
+    "message": "sekunde",
+    "description": "second"
+  },
+  "bookmarksItem_now": {
+    "message": "Jetzt",
+    "description": "Now"
+  },
+  "bookmarksItem_ago": {
+    "message": "Vor $time$",
+    "description": "Text for time in the past",
+    "placeholders": {
+      "time": {
+        "content": "$1",
+        "example": "2 days 1 hour"
+      }
+    }
   },
   "prediction_Episode": {
     "message": "Nächste Episode erwartet in $time$",
@@ -390,6 +448,10 @@
   "correction_NewUrlReset": {
     "message": "URL zurückgesetzt",
     "description": "URL reset"
+  },
+  "correction_DBRequest": {
+    "message": "Dies als Korrektur an die Datenbank senden?",
+    "description": "Popup that shows up when the user corrects an anime and asks if this change should be sent to the dabase for correction"
   },
   "overview_Continue_anime": {
     "message": "Weiterschauen",
@@ -520,7 +582,7 @@
     "description": "Thumbnails"
   },
   "settings_Thumbnails_text": {
-    "message": "Diese Option definiert die größe der Thumbnails auf MAL.<br>Wie zum Beispiel für characters, people und recommendations",
+    "message": "Diese Option definiert die größe der Thumbnails auf MAL. Wie zum Beispiel für characters, people und recommendations",
     "description": "Thumbnails - Text"
   },
   "settings_Thumbnails_Large": {
@@ -551,10 +613,6 @@
     "message": "Benutze Tags/Notes",
     "description": "Use Tags/Notes"
   },
-  "settings_malTags_Text": {
-    "message": "Wenn aktiviert werden auf deiner Animeliste links zu der zuletzt benutzten Streaming Seite angezeigt.",
-    "description": "Use Tags/Notes - Text"
-  },
   "settings_malContinue": {
     "message": "Nächste Episode Links",
     "description": "Continue watching links"
@@ -563,9 +621,17 @@
     "message": "Links für die Episoden Wiederaufnahme",
     "description": "Resume watching links"
   },
+  "settings_usedPage": {
+    "message": "Links zu der zuletzt verwendeten Webseite",
+    "description": "Last used page links"
+  },
   "settings_miniMAL_floatButtonStealth": {
-    "message": "Unauffälliger miniMAL Menü Button",
-    "description": "Stealth floating menu button"
+    "message": "Stealth UI mode",
+    "description": "Stealth UI mode. Lowers the visibility of some malSync UI elements"
+  },
+  "settings_miniMAL_minimizeBigPopup": {
+    "message": "Minimiere große Popups",
+    "description": "Shows an 'action required' popup hidding big popups"
   },
   "settings_miniMAL_floatButtonHide": {
     "message": "Verstecke den miniMAL Menü Button",
@@ -623,13 +689,33 @@
     "message": "Auto fortsetzen",
     "description": "Auto resume video where you left off toggle"
   },
+  "settings_autoNextEp": {
+    "message": "Automatisches Abspielen der nächsten Folge",
+    "description": "Autoplays the next episode after the video ends"
+  },
+  "settings_Shortcuts_Correction": {
+    "message": "Verbesserungsoberfläche Tastenkombination",
+    "description": "Text for the correction ui shortcut"
+  },
+  "settings_Shortcuts_Sync": {
+    "message": "Setzte die Episode/Kapitel als gelesen",
+    "description": "Text for the sync ui shortcut"
+  },
+  "settings_Shortcuts_Next_Episode": {
+    "message": "Tastenkombination zum Öffnen der nächsten Episode",
+    "description": "Description for the next episode shortcut option"
+  },
   "settings_Shortcuts_Skip_Forward": {
-    "message": "Überspringt das Intros",
+    "message": "Überspringt das Intro",
     "description": "Description for the the opening skip shortcut"
   },
   "settings_Shortcuts_Skip_Backward": {
     "message": "Springt zum Anfang des Intros",
     "description": "Description for the the opening skip shortcut"
+  },
+  "settings_Shortcuts_Click": {
+    "message": "Tastenkombination setzen",
+    "description": "Shown if no shortcut is set for an option"
   },
   "settings_introSkip": {
     "message": "Springe $Seconds$ Sekunden vor oder zurück",
@@ -682,12 +768,28 @@
     "description": "Strict Cookies"
   },
   "settings_StrictCookies_Text": {
-    "message": "Diese Option aktiviert die Firefox Multi-Account Containers Unterstützung. Starte dem Browser nach dem aktivieren.",
+    "message": "Diese Option aktiviert die Firefox Multi-Account Containers Unterstützung. Starte den Browser nach dem aktivieren bitte neu.",
     "description": "Strict Cookies - Text"
+  },
+  "settings_highlightAllEp": {
+    "message": "Alle Episoden/Kapitel hervorheben",
+    "description": "Highlight all Episodes/Chapters"
+  },
+  "settings_highlightAllEp_Text": {
+    "message": "Diese Option hebt alle angesehenen Kapitel / Episoden in der Liste hervor, die du auf einigen Anime / Manga-Websites finden kannst",
+    "description": "Highlight all Episodes/Chapters - Text"
   },
   "settings_ClearCache": {
     "message": "Cache leeren",
     "description": "Clear Cache"
+  },
+  "settings_presenceHidePage": {
+    "message": "Das MAL-Sync-Symbol anstelle des Seitensymbols anzeigen",
+    "description": "Option on the settings page to replace the anime streaming page icon in the discord rich text presence with the mal-sync icon. If the user does not want to show everyone what page he is using"
+  },
+  "settings_shortcut_tooltip": {
+    "message": "Es wird nicht empfohlen, die Verknüpfung auf eine einzelne Taste festzulegen",
+    "description": "Shows this message if the users has only a single key set as shortcut"
   },
   "updateCheck_Refresh": {
     "message": "Refresh",
@@ -780,7 +882,7 @@
     "description": "How to use description text",
     "placeholders": {
       "Link1": {
-        "content": "<a target=\"_blank\" href=\"https://github.com/lolamtisch/MALSync#supported-pages-\">",
+        "content": "<a target=\"_blank\" href=\"https://github.com/MALSync/MALSync#supported-pages-\">",
         "example": "<a>"
       },
       "LinkEnd1": {
@@ -846,5 +948,23 @@
         "example": "</a>"
       }
     }
+  },
+  "Discord_rpc_browsing": {
+    "message": "Auf $Page$ surfend",
+    "description": "Discord rich Presence text if on overview page",
+    "placeholders": {
+      "Page": {
+        "content": "$1",
+        "example": "Mangadex"
+      }
+    }
+  },
+  "nextEpShort_no_support": {
+    "message": "Diese Seite unterstützt das Öffnen der nächsten Episode nicht",
+    "description": "Error message if the page does not support opening the next episode after pressing the shortcut"
+  },
+  "nextEpShort_no_nextEp": {
+    "message": "Die nächste Folge konnte nicht gefunden werden",
+    "description": "Error message if no next episode could be found after pressing the next episode shortcut"
   }
 }
