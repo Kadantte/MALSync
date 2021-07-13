@@ -6,6 +6,9 @@ export class UserList extends ListAbstract {
   authenticationUrl = 'https://myanimelist.net/login.php';
 
   async getUsername() {
+    throw 'no';
+    return Promise.resolve('');
+    /*
     const url = 'https://myanimelist.net/panel.php?go=export&hideLayout';
     const response = await api.request.xhr('GET', url);
     const usernameMatches = response.responseText.match(/USER_NAME = "(.*?)"/);
@@ -16,6 +19,7 @@ export class UserList extends ListAbstract {
       };
 
     return usernameMatches[1];
+    */
   }
 
   errorHandling(res) {
@@ -28,13 +32,61 @@ export class UserList extends ListAbstract {
     }
   }
 
+  _getSortingOptions() {
+    return [
+      {
+        icon: 'sort_by_alpha',
+        title: 'Alphabetic',
+        value: 'alpha',
+        asc: true,
+      },
+      {
+        icon: 'history',
+        title: 'Last Updated',
+        value: 'updated',
+        asc: true,
+      },
+      {
+        icon: 'score',
+        title: 'Score',
+        value: 'score',
+        asc: true,
+      },
+    ];
+  }
+
+  getOrder(sort) {
+    let pre = '';
+
+    if (sort.endsWith('_asc')) pre = '-';
+
+    const sortString = sort.replace('_asc', '');
+    switch (sortString) {
+      case 'alpha':
+        return pre + 1;
+      case 'updated':
+        return pre + 5;
+      case 'score':
+        return pre + 4;
+      default:
+        if (this.status === 1) return this.getOrder('updated');
+        if (this.status === 6) return this.getOrder('updated');
+        return this.getOrder('alpha');
+    }
+  }
+
   async getPart() {
+    throw 'no';
+    return [];
+    /*
     if (!this.username) {
       this.username = await this.getUsername();
     }
+
+    const order = this.getOrder(this.sort);
     let sorting = '';
-    if (this.status === 1) {
-      sorting = '&order=5';
+    if (order) {
+      sorting = `&order=${order}`;
     }
     con.log(
       '[UserList][MAL]',
@@ -54,6 +106,7 @@ export class UserList extends ListAbstract {
       }
       return data;
     });
+    */
   }
 
   public async prepareData(data): Promise<listElement[]> {
@@ -65,6 +118,7 @@ export class UserList extends ListAbstract {
           await this.fn({
             uid: el.anime_id,
             malId: el.anime_id,
+            apiCacheKey: el.anime_id,
             cacheKey: el.anime_id,
             type: this.listType,
             title: el.anime_title,
@@ -83,6 +137,7 @@ export class UserList extends ListAbstract {
           await this.fn({
             uid: el.manga_id,
             malId: el.manga_id,
+            apiCacheKey: el.manga_id,
             cacheKey: el.manga_id,
             type: this.listType,
             title: el.manga_title,

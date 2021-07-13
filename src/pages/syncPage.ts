@@ -5,6 +5,7 @@ import { providerTemplates } from '../provider/templates';
 import { fullscreenNotification, getPlayerTime } from '../utils/player';
 import { SearchClass } from '../_provider/Search/vueSearchClass';
 import { emitter } from '../utils/emitter';
+import { Cache } from '../utils/Cache';
 
 declare let browser: any;
 
@@ -16,6 +17,8 @@ if (typeof browser !== 'undefined' && typeof chrome !== 'undefined') {
 const logger = con.m('Sync', '#348fff');
 
 let browsingTimeout;
+
+let playerTimeout;
 
 export class SyncPage {
   page: pageInterface;
@@ -41,6 +44,15 @@ export class SyncPage {
     }
     this.domainSet();
     logger.log('Page', this.page.name);
+    if (
+      !(
+        typeof api.settings.get('enablePages')[this.page.name] === 'undefined' ||
+        api.settings.get('enablePages')[this.page.name]
+      )
+    ) {
+      logger.info('Sync is disabled for this page', this.page.name);
+      throw 'Stop Script';
+    }
     emitter.on('syncPage_fillUi', () => this.fillUI());
   }
 
@@ -133,6 +145,7 @@ export class SyncPage {
   }
 
   public setVideoTime(item, timeCb) {
+    this.resetPlayerError();
     const syncDuration = api.settings.get('videoDuration');
     const progress = (item.current / (item.duration * (syncDuration / 100))) * 100;
     if (j.$('#malSyncProgress').length) {
@@ -263,6 +276,7 @@ export class SyncPage {
   }
 
   async handlePage(curUrl = window.location.href) {
+    this.resetPlayerError();
     let state: pageState;
     this.curState = undefined;
     this.searchObj = undefined;
@@ -406,16 +420,6 @@ export class SyncPage {
 
       // sync
       if (this.page.isSyncPage(this.url)) {
-        if (
-          !(
-            typeof api.settings.get('enablePages')[this.page.name] === 'undefined' ||
-            api.settings.get('enablePages')[this.page.name]
-          )
-        ) {
-          logger.info('Sync is disabled for this page', this.page.name);
-          return;
-        }
-
         const rerun = await this.searchObj.openCorrectionCheck();
 
         if (rerun) {
@@ -432,6 +436,11 @@ export class SyncPage {
             this.singleObj.setVolume(state.volume);
 
           logger.log(`Start Sync (${api.settings.get('delay')} Seconds)`);
+
+          // filler
+          if (this.singleObj.getMalId() && this.singleObj.getType() === 'anime' && api.settings.get('checkForFiller')) {
+            this.checkForFiller(this.singleObj.getMalId(), this.singleObj.getEpisode());
+          }
 
           if (api.settings.get(`autoTrackingMode${this.page.type}`) === 'instant') {
             setTimeout(() => {
@@ -454,6 +463,10 @@ export class SyncPage {
                 <div id="malSyncProgress" class="ms-loading" style="background-color: transparent; position: absolute; top: 0; left: 0; right: 0; height: 4px;">
                   <div class="ms-progress" style="background-color: #2980b9; width: 0%; height: 100%; transition: width 1s;"></div>
                 </div>
+                <div class="player-error" style="display: none; position: absolute; left: 0; right: 0; padding: 5px; bottom: 100%; color: rgb(255,64,129); background-color: #323232;">
+                  ${api.storage.lang('syncPage_flash_player_error')}
+                  <a href="https://discord.com/invite/cTH4yaw" style="display: block; padding: 10px">Help</a>
+                </div>
               ${message}`;
               options = {
                 hoverInfo: true,
@@ -466,10 +479,17 @@ export class SyncPage {
             utils
               .flashm(message, options)
               .find('.sync')
-              .on('click', function() {
+              .on('click', () => {
                 j.$('.flashinfo').remove();
                 sync();
+                this.resetPlayerError();
               });
+
+            // Show error if no player gets detected for 5 minutes
+            playerTimeout = setTimeout(() => {
+              j.$('#flashinfo-div').addClass('player-error');
+            }, 5 * 60 * 1000);
+
             // Debugging
             logger.log('overviewUrl', This.page.sync.getOverviewUrl(This.url));
             if (typeof This.page.sync.nextEpUrl !== 'undefined') {
@@ -492,7 +512,15 @@ export class SyncPage {
         }
       }
 
-      this.imageFallback();
+      await this.imageFallback();
+    }
+  }
+
+  public resetPlayerError() {
+    if (playerTimeout) {
+      clearTimeout(playerTimeout);
+      playerTimeout = undefined;
+      j.$('#flashinfo-div').removeClass('player-error');
     }
   }
 
@@ -838,6 +866,7 @@ export class SyncPage {
             () => {
               this.setOffset(0);
             },
+            true,
           );
         }
         return;
@@ -845,9 +874,9 @@ export class SyncPage {
     }
   }
 
-  imageFallback() {
+  async imageFallback() {
     if (this.singleObj && typeof this.singleObj.setImage !== 'undefined' && this.page.getImage) {
-      const image = this.page.getImage();
+      const image = await this.page.getImage();
       if (image) this.singleObj.setImage(image);
     }
   }
@@ -1133,5 +1162,52 @@ export class SyncPage {
       logger.error(e);
     }
     sendResponse({});
+  }
+
+  private async checkForFiller(malid: number, episode: number) {
+    const page = Math.ceil(episode / 100);
+
+    const cacheObj = new Cache(`fillers/${malid}/${page}`, 7 * 24 * 60 * 60 * 1000);
+
+    if (!(await cacheObj.hasValueAndIsNotEmpty())) {
+      const url = `https://api.jikan.moe/v3/anime/${malid}/episodes/${page}`;
+      const request = await api.request.xhr('GET', url).then(async response => {
+        if (response.status === 200 && response.responseText) {
+          const data = JSON.parse(response.responseText);
+          if (data.episodes && data.episodes.length) {
+            try {
+              return data.episodes.map(e => ({
+                filler: e.filler,
+                recap: e.recap,
+                episode_id: e.episode_id,
+              }));
+            } catch (e) {
+              // do nothing.
+            }
+          }
+        }
+        return [];
+      });
+      await cacheObj.setValue(request);
+    }
+    const episodes = await cacheObj.getValue();
+
+    if (episodes && episodes.length) {
+      const episodeData = episodes.find(e => e.episode_id === episode);
+      if (episodeData && (episodeData.filler || episodeData.recap)) {
+        const type = episodeData.filler ? 'filler' : 'recap';
+        utils.flashConfirm(
+          api.storage.lang(`filler_${type}_confirm`),
+          'filler',
+          () => {
+            this.openNextEp();
+          },
+          () => {
+            // do nothing.
+          },
+          true,
+        );
+      }
+    }
   }
 }

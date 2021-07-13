@@ -70,13 +70,62 @@ export class UserList extends ListAbstract {
     return api.settings.get('kitsuToken');
   }
 
+  _getSortingOptions() {
+    return [
+      {
+        icon: 'sort_by_alpha',
+        title: 'Alphabetic',
+        value: 'alpha',
+        asc: true,
+      },
+      {
+        icon: 'history',
+        title: 'Last Updated',
+        value: 'updated',
+        asc: true,
+      },
+      {
+        icon: 'score',
+        title: 'Score',
+        value: 'score',
+        asc: true,
+      },
+    ];
+  }
+
+  getOrder(sort) {
+    let pre = '';
+
+    if (!sort.endsWith('_asc')) pre = '-';
+
+    const sortString = sort.replace('_asc', '');
+    switch (sortString) {
+      case 'alpha':
+        pre = pre ? '' : '-';
+        return `${pre}${this.listType}.titles.en`;
+      case 'updated':
+        return `${pre}progressed_at`;
+      case 'score':
+        return `${pre}rating`;
+      default:
+        if (this.status === 1) return this.getOrder('updated');
+        if (this.status === 6) return this.getOrder('updated');
+        return this.getOrder('alpha');
+    }
+  }
+
   async getPart() {
     const userid = await this.getUserId();
 
     let statusPart = '';
     let sorting = '';
+
+    const order = this.getOrder(this.sort);
+    if (order) {
+      sorting = `&sort=${order}`;
+    }
+
     if (this.status !== 7) {
-      if (this.status === 1) sorting = '&sort=-progressed_at';
       const statusTemp = helper.translateList(this.status, this.status);
       statusPart = `&filter[status]=${statusTemp}`;
     }
@@ -139,6 +188,7 @@ export class UserList extends ListAbstract {
       if (listType === 'anime') {
         tempData = await this.fn({
           malId,
+          apiCacheKey: malId,
           uid: el.id,
           cacheKey: helper.getCacheKey(malId, el.id),
           kitsuSlug: el.attributes.slug,
@@ -156,6 +206,7 @@ export class UserList extends ListAbstract {
       } else {
         tempData = await this.fn({
           malId,
+          apiCacheKey: malId,
           uid: el.id,
           cacheKey: helper.getCacheKey(malId, el.id),
           kitsuSlug: el.attributes.slug,

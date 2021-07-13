@@ -23,11 +23,10 @@ import { AnimeKisa } from './AnimeKisa/main';
 import { Wakanim } from './Wakanim/main';
 import { AnimeIndo } from './AnimeIndo/main';
 import { Shinden } from './Shinden/main';
-import { Funimation } from './Funimation/main';
 import { Voiranime } from './Voiranime/main';
 import { DubbedAnime } from './DubbedAnime/main';
 import { VIZ } from './VIZ/main';
-import { MangaNelo } from './MangaNelo/main';
+import { MangaNato } from './MangaNato/main';
 import { NekoSama } from './NekoSama/main';
 import { AnimeZone } from './AnimeZone/main';
 import { AnimeOdcinki } from './AnimeOdcinki/main';
@@ -43,7 +42,6 @@ import { JapScan } from './JapScan/main';
 import { Goyabu } from './Goyabu/main';
 import { AnimesVision } from './AnimesVision/main';
 import { Hulu } from './Hulu/main';
-import { Aniwatch } from './Aniwatch/main';
 import { Hidive } from './Hidive/main';
 import { FallenAngels } from './FallenAngels/main';
 import { PrimeVideo } from './PrimeVideo/main';
@@ -64,6 +62,7 @@ import { TRanimeizle } from './TRanimeizle/main';
 import { Anihub } from './Anihub/main';
 import { AnimeStreamingFR } from './AnimeStreamingFR/main';
 import { Scantrad } from './Scantrad/main';
+import { Furyosquad } from './Furyosquad/main';
 import { AnimeId } from './AnimeId/main';
 import { AniMixPlay } from './AniMixPlay/main';
 import { MyAnimeListVideo } from './MyAnimeListVideo/main';
@@ -73,7 +72,7 @@ import { MangaHere } from './MangaHere/main';
 import { MangaFox } from './MangaFox/main';
 import { JustAnime } from './JustAnime/main';
 import { YayAnimes } from './YayAnimes/main';
-import { AnimeDesu } from './AnimeDesu/main';
+import { DesuOnline } from './DesuOnline/main';
 import { Simplyaweeb } from './Simplyaweeb/main';
 import { Animevibe } from './Animevibe/main';
 import { WuxiaWorld } from './WuxiaWorld/main';
@@ -116,8 +115,24 @@ import { Fumetsu } from './Fumetsu/main';
 import { NonstopScans } from './NonstopScans/main';
 import { FrixySubs } from './FrixySubs/main';
 import { Guya } from './Guya/main';
-import { AnimesHD } from './AnimesHD/main';
 import { MangaHub } from './MangaHub/main';
+import { ComicK } from './ComicK/main';
+import { AnimeShitai } from './AnimeShitai/main';
+import { KangaryuTeam } from './KangaryuTeam/main';
+import { Japanread } from './Japanread/main';
+import { CatManga } from './CatManga/main';
+import { MangaSushi } from './MangaSushi/main';
+import { ArangScans } from './ArangScans/main';
+import { HunlightScans } from './HunlightScans/main';
+import { TritiniaScans } from './TritiniaScans/main';
+import { ReadManhua } from './ReadManhua/main';
+import { FlameScans } from './FlameScans/main';
+import { ImmortalUpdates } from './ImmortalUpdates/main';
+import { Zoro } from './Zoro/main';
+import { Funimation } from './Funimation/main';
+import { Kitsune } from './Kitsune/main';
+import { AnimesOnline } from './AnimesOnline/main';
+import { LHTranslation } from './LHTranslation/main';
 
 export const pages = {
   nineAnime,
@@ -145,10 +160,9 @@ export const pages = {
   AnimeKisa,
   AnimeIndo,
   Shinden,
-  Funimation,
   Voiranime,
   DubbedAnime,
-  MangaNelo,
+  MangaNato,
   VIZ,
   NekoSama,
   AnimeOdcinki,
@@ -165,7 +179,6 @@ export const pages = {
   Goyabu,
   AnimesVision,
   Hulu,
-  Aniwatch,
   Hidive,
   FallenAngels,
   PrimeVideo,
@@ -186,6 +199,7 @@ export const pages = {
   Anihub,
   AnimeStreamingFR,
   Scantrad,
+  Furyosquad,
   AnimeId,
   AniMixPlay,
   MyAnimeListVideo,
@@ -195,7 +209,7 @@ export const pages = {
   MangaFox,
   JustAnime,
   YayAnimes,
-  AnimeDesu,
+  DesuOnline,
   Simplyaweeb,
   Animevibe,
   WuxiaWorld,
@@ -238,6 +252,22 @@ export const pages = {
   NonstopScans,
   FrixySubs,
   Guya,
-  AnimesHD,
   MangaHub,
+  ComicK,
+  AnimeShitai,
+  KangaryuTeam,
+  Japanread,
+  CatManga,
+  MangaSushi,
+  ArangScans,
+  HunlightScans,
+  TritiniaScans,
+  ReadManhua,
+  FlameScans,
+  ImmortalUpdates,
+  Zoro,
+  Funimation,
+  Kitsune,
+  AnimesOnline,
+  LHTranslation,
 };

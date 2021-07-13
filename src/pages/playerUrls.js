@@ -248,7 +248,16 @@ module.exports = {
   },
   // 9anime
   streamtape: {
-    match: ['*://streamtape.com/*', '*://streamtape.net/*', '*://streamtape.xyz/*', '*://streamtape.to/*'],
+    match: [
+      '*://streamtape.com/*',
+      '*://streamtape.net/*',
+      '*://streamtape.xyz/*',
+      '*://streamtape.to/*',
+      '*://strcloud.in/*',
+      '*://strcloud.link/*',
+      '*://streamta.pe/*',
+      '*://strtape.tech/*',
+    ],
   },
   // monoschinos
   monoschinos: {
@@ -303,6 +312,12 @@ module.exports = {
       '*://*.gogo-play.net/streaming.php?*',
       '*://*.gogo-play.net/load.php?*',
       '*://*.gogo-play.net/loadserver.php?*',
+      '*://*.gogo-play.tv/streaming.php?*',
+      '*://*.gogo-play.tv/load.php?*',
+      '*://*.gogo-play.tv/loadserver.php?*',
+      '*://*.streamani.net/streaming.php?*',
+      '*://*.streamani.net/load.php?*',
+      '*://*.streamani.net/loadserver.php?*',
     ],
   },
   // bs.to
@@ -311,18 +326,18 @@ module.exports = {
   },
   // pantsubase.tv
   googleDrive: {
-    match: ['*://ani.googledrive.stream/vidstreaming/*'],
+    match: ['*://ani.googledrive.stream/vidstreaming/*', '*://play.api-web.site/anime/*'],
   },
   AnimeLab: {
     match: ['*://www.animelab.com/*'],
   },
   // 9anime
   vidstream: {
-    match: ['*://vidstream.pro/e/*'],
+    match: ['*://vidstream.pro/e/*', '*://vidstreamz.online/embed/*', '*://vidstream.pro/embed/*'],
   },
   // gogo
   streamsb: {
-    match: ['*://streamsb.net/*', '*://streamsb.com/*'],
+    match: ['*://streamsb.net/*', '*://streamsb.com/*', '*://sbembed.com/*', '*://sbvideo.net/*', '*://sbplay.org/*'],
   },
   // gogo
   dood: {
@@ -406,7 +421,11 @@ module.exports = {
   },
   // kickassanime
   kaaplay: {
-    match: ['*://kaa-play.com/*'],
+    match: ['*://kaa-play.com/*', '*://kaa-play.me/*'],
+  },
+  // kickassanime
+  betaplayer: {
+    match: ['*://betaplayer.life/*'],
   },
   // animeshouse
   animeshouse: {
@@ -417,7 +436,28 @@ module.exports = {
     match: ['*://animato.me/embed/*'],
   },
   // animeshd
-  animeshd: {
-    match: ['*://animeshd.org/*/*id=*'],
+  AnimesOnline: {
+    match: ['*://animesonline.org/*/*id=*'],
+  },
+  // animixplay
+  kimanime: {
+    match: ['*://kimanime.ru/AnimeIframe/*'],
+  },
+  // animixplay
+  github: {
+    match: [
+      '*://akaneshinjou.github.io/*',
+      '*://akane-shinjou.github.io/*',
+      '*://andhaetg.github.io/*',
+      '*://akaneshinjou.netlify.app/*',
+    ],
+  },
+  // zoro
+  vidcloud: {
+    match: ['*://vidcloud.spb.ru/*', '*://vidcloud.one/*'],
+  },
+  // gogoanime
+  streamhd: {
+    match: ['*://*.streamhd.cc/*'],
   },
 };

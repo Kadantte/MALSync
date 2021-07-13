@@ -47,6 +47,10 @@ export class UserList extends ListAbstract {
     }
   }
 
+  _getSortingOptions() {
+    return [];
+  }
+
   async getPart() {
     con.log('[UserList][Simkl]', `status: ${this.status}`);
     if (this.listType === 'manga') throw { code: 415, message: 'Does not support manga' };
@@ -73,6 +77,7 @@ export class UserList extends ListAbstract {
       if (listType === 'anime') {
         const tempData = await this.fn({
           malId: el.show.ids.mal,
+          apiCacheKey: el.show.ids.mal,
           uid: el.show.ids.simkl,
           cacheKey: this.getCacheKey(el.show.ids.mal, el.show.ids.simkl),
           type: listType,

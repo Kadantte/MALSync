@@ -1,0 +1,6 @@
+{
+  "search": "https://manganato.com/search/story/{searchterm}",
+  "urls": {
+    "match": ["*://manganato.com/*", "*://readmanganato.com/*"]
+  }
+}

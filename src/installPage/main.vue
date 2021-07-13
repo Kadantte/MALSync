@@ -53,7 +53,7 @@
                 <option value="SIMKL">Simkl</option>
               </select>
             </span>
-            <div v-if="options.syncMode !== 'MAL'" class="syncExtended">
+            <div v-if="options.syncMode !== ''" class="syncExtended">
               <li v-if="options.syncMode == 'SIMKL'" class="mdl-list__item">
                 <span class="mdl-list__item-primary-content">
                   Simkl
@@ -71,7 +71,17 @@
                 <option value="ANILIST">AniList</option>
                 <option value="KITSU">Kitsu</option>
               </dropdown>
-
+              <li
+                v-if="options.syncMode == 'MAL' || (options.syncMode == 'SIMKL' && options.syncModeSimkl == 'MAL')"
+                class="mdl-list__item"
+              >
+                <span class="mdl-list__item-primary-content">
+                  MyAnimeList
+                </span>
+                <span class="mdl-list__item-secondary-action">
+                  <a target="_blank" href="https://malsync.moe/mal/oauth">{{ lang('settings_Authenticate') }}</a>
+                </span>
+              </li>
               <li
                 v-if="
                   options.syncMode == 'ANILIST' || (options.syncMode == 'SIMKL' && options.syncModeSimkl == 'ANILIST')
@@ -109,13 +119,7 @@
 
             <h4>{{ lang('installPage_Wrong') }}</h4>
             <p>{{ lang('installPage_Wrong_Description') }}</p>
-            <button
-              class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent"
-              @click="show = !show"
-            >
-              {{ lang('Show') }}
-            </button>
-            <p v-if="show" class="correctionGif">
+            <p class="correctionGif">
               <img
                 id="hiddenimage"
                 height="338"
@@ -125,12 +129,15 @@
               />
             </p>
 
+            <h4>Quicklinks</h4>
+            <quicklinksEdit />
+
             <h4>{{ lang('minimalClass_versionMsg_Text_4') }}</h4>
             <a target="_blank" href="https://github.com/Karmesinrot/Anifiltrs#anifiltrs">
               <img alt="Filter List" src="https://img.shields.io/badge/ublock-Anifiltrs-800900.svg?style=flat-square" />
             </a>
             <h4>{{ lang('minimalClass_versionMsg_Text_2') }}</h4>
-            <a target="_blank" href="https://discordapp.com/invite/cTH4yaw">
+            <a target="_blank" href="https://discord.com/invite/cTH4yaw">
               <img
                 alt="Discord"
                 src="https://img.shields.io/discord/358599430502481920.svg?style=flat-square&amp;logo=discord&amp;label=Discord&amp;colorB=7289DA"
@@ -233,14 +240,59 @@ p {
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-top: none;
 }
+
+#quicklinkedit {
+  background-color: #f9f9f9;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+
+  .backbutton-settings,
+  .custom {
+    display: none;
+  }
+  .quicklinks {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 15px;
+    .quicklink {
+      opacity: 0.5;
+      font-size: 13px;
+      cursor: pointer;
+      &.active {
+        opacity: 1;
+      }
+      &.home {
+        background-color: #ff6767;
+      }
+      &.search {
+        background-color: #e4e461;
+      }
+      &.database {
+        background-color: #90e963;
+      }
+      &.custom {
+        background-color: white;
+      }
+    }
+  }
+  .darkbox {
+    background-color: #0000002b;
+    padding: 5px;
+  }
+  td {
+    padding: 7px 2px;
+  }
+}
 </style>
 
 <script type="text/javascript">
+import quicklinksEdit from '../minimal/minimalApp/components/quicklinksEdit.vue';
 import dropdown from '../minimal/minimalApp/components/settingsDropdown.vue';
 
 export default {
   components: {
     dropdown,
+    quicklinksEdit,
   },
   data: () => ({
     options: api.settings.options,

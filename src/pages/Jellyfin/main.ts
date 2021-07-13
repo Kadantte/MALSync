@@ -69,36 +69,39 @@ async function urlChange(page) {
 
 async function checkItemId(page, id, curUrl = '', video = false) {
   let reqUrl = `/Items?ids=${id}`;
+  // eslint-disable-next-line consistent-return
   apiCall(reqUrl, true).then(response => {
     const data = JSON.parse(response.responseText);
+    if (!data.Items.length) {
+      return checkIfAuthIsUpToDate();
+    }
     switch (data.Items[0].Type) {
       case 'Episode':
       case 'Season':
         if (data.Items[0].Type === 'Episode' && !video) {
           con.log('Execute Episode only on video');
+          // eslint-disable-next-line consistent-return
           return;
         }
 
         con.log('Season', data);
         item = data.Items[0];
-        reqUrl = `/Genres?Ids=${item.SeriesId}`;
-        apiCall(reqUrl).then(response2 => {
+        reqUrl = `/Items/${item.SeriesId}`;
+        apiCall(reqUrl, true).then(response2 => {
           const genres: any = JSON.parse(response2.responseText);
           con.log('genres', genres);
-          for (let i = 0; i < genres.Items.length; i++) {
-            const genre = genres.Items[i];
-            if (genre.Name === 'Anime') {
-              con.info('Anime detected');
-              if (curUrl) {
-                page.url = curUrl;
-                page.handlePage(page.url);
-              } else {
-                page.handlePage();
-              }
-
-              $('html').removeClass('miniMAL-hide');
-              break;
+          if (genres.Path.includes('Anime') || genres.GenreItems.find(genre => genre.Name.toLowerCase() === 'anime')) {
+            con.info('Anime detected');
+            if (curUrl) {
+              page.url = curUrl;
+              page.handlePage(page.url);
+            } else {
+              page.handlePage();
             }
+
+            $('html').removeClass('miniMAL-hide');
+          } else {
+            con.error('Not an Anime');
           }
         });
         break;
@@ -112,24 +115,55 @@ async function checkItemId(page, id, curUrl = '', video = false) {
 }
 
 async function returnPlayingItemId() {
+  const deviceId = await getDeviceId();
+  const userId = await getUser();
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       resolve();
     }, 10000);
-  }).then(() => {
-    return apiCall('/Sessions', false, true).then(response => {
-      const data = JSON.parse(response.responseText);
-      con.log('Session', data);
-      for (let i = 0; i < data.length; i++) {
-        const sess = data[i];
-        if (typeof sess.NowPlayingItem !== 'undefined') {
-          con.log('Now Playing', sess.NowPlayingItem);
-          return sess.NowPlayingItem.Id;
-        }
-      }
-      return '';
+  }).then(async () => {
+    return getSession(deviceId, userId).then(sess => {
+      con.log('Now Playing', sess.NowPlayingItem);
+      return sess.NowPlayingItem.Id;
     });
   });
+}
+
+async function getSession(deviceId, userId, user = true) {
+  return apiCall('/Sessions', false, user).then(response => {
+    const data = JSON.parse(response.responseText);
+    con.m('Session').log('Session', data, deviceId, userId, user);
+    return parseSession(data, deviceId, userId, user);
+  });
+}
+
+async function parseSession(data, deviceId, userId, user) {
+  if (deviceId) {
+    data = data.filter(el => el.DeviceId === deviceId);
+  } else if (userId) {
+    data = data.filter(el => el.UserId === userId);
+  }
+  data = data.filter(el => typeof el.NowPlayingItem !== 'undefined');
+
+  if (!data.length) {
+    if (deviceId) {
+      con
+        .m('Session')
+        .m(user)
+        .log('Fallback to userId');
+      return parseSession(data, null, userId, user);
+    }
+    if (user) {
+      con
+        .m('Session')
+        .m(user)
+        .log('Fallback to request without ControllableByUserId');
+      return getSession(deviceId, userId, false);
+    }
+    throw 'Could not get session';
+  }
+  con.m('Session').log('found', data);
+  return data[0];
 }
 
 async function testApi(retry = 0) {
@@ -193,12 +227,52 @@ async function checkApiClient() {
         }
         if (apiClient._currentUser && apiClient._currentUser.Id) {
           setUser(apiClient._currentUser.Id);
+        } else if (apiClient._serverInfo && apiClient._serverInfo.UserId) {
+          setUser(apiClient._serverInfo.UserId);
         }
         resolve(true);
         return;
       }
       reject();
     });
+  });
+}
+
+async function getDeviceId(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    proxy.addProxy(async (caller: ScriptProxy) => {
+      const apiClient: any = proxy.getCaptureVariable('ApiClient');
+      con.m('apiClient').log(apiClient);
+
+      if (apiClient && apiClient._deviceId) {
+        con.m('apiClient').log('clientId', apiClient._deviceId);
+        resolve(apiClient._deviceId);
+        return;
+      }
+      reject();
+    });
+  });
+}
+
+function checkIfAuthIsUpToDate() {
+  proxy.addProxy(async (caller: ScriptProxy) => {
+    const apiClient: any = proxy.getCaptureVariable('ApiClient');
+    con.m('apiClient').log(apiClient);
+    const curKey = getApiKey();
+
+    if (
+      apiClient &&
+      apiClient._serverInfo &&
+      apiClient._serverInfo.AccessToken &&
+      curKey === apiClient._serverInfo.AccessToken
+    ) {
+      return;
+    }
+    con.error('Reset Authentication');
+    await setBase('');
+    await setApiKey('');
+    await setUser('');
+    await checkApiClient();
   });
 }
 

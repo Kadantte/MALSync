@@ -44,7 +44,7 @@ const metadata = {
   downloadURL:
     'https://github.com/MALSync/MALSync/releases/latest/download/malsync.user.js',
   updateURL:
-    'https://greasyfork.org/scripts/372847-mal-sync/code/MAL-Sync.meta.js',
+    'https://github.com/MALSync/MALSync/releases/latest/download/malsync.user.js',
   grant: [
     'GM_xmlhttpRequest',
     'GM_getValue',
@@ -62,7 +62,7 @@ const metadata = {
     generateMatchExcludes(playerUrls).match,
   ),
   exclude: generateMatchExcludes(pageUrls).exclude,
-  'require ': 'http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js',
+  'require ': 'http://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js',
   resource: generateResources(),
   'run-at': 'document_start',
   connect: [
@@ -157,7 +157,7 @@ module.exports = {
           beautify: true,
           comments: false,
         },
-        mangle: false,
+        mangle: true,
         compress: true,
       },
     }),

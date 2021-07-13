@@ -267,7 +267,7 @@ export class Minimal {
               {
                 permissions: ['webRequest', 'webRequestBlocking'],
                 origins: chrome.runtime.getManifest().optional_permissions!.filter(permission => {
-                  return permission !== 'webRequest' && permission !== 'webRequestBlocking' && permission !== 'cookies';
+                  return permission !== 'webRequest' && permission !== 'webRequestBlocking';
                 }),
               },
               function(granted) {
@@ -305,49 +305,9 @@ export class Minimal {
       this.minimalVue.$children[0].selectTab('customDomains');
     });
 
-    try {
-      if (api.type === 'webextension') {
-        chrome.permissions.contains(
-          {
-            permissions: ['cookies'],
-          },
-          result => {
-            if (result) {
-              if (!this.minimal.find('#strictCookies')[0].checked) {
-                this.minimal.find('#strictCookies').trigger('click');
-              }
-            }
-            this.minimal.find('#strictCookies').change(() => {
-              if (this.minimal.find('#strictCookies')[0].checked) {
-                con.log('strictCookies checked');
-                chrome.permissions.request(
-                  {
-                    permissions: ['cookies'],
-                    origins: [],
-                  },
-                  function(granted) {
-                    con.log('optional_permissions', granted);
-                  },
-                );
-              } else {
-                con.log('strictCookies not checked');
-                chrome.permissions.remove(
-                  {
-                    permissions: ['cookies'],
-                    origins: [],
-                  },
-                  function(remove) {
-                    con.log('optional_permissions_remove', remove);
-                  },
-                );
-              }
-            });
-          },
-        );
-      }
-    } catch (e) {
-      con.error(e);
-    }
+    this.minimal.find('#quicklinkoverview').click(() => {
+      this.minimalVue.$children[0].selectTab('quicklinks');
+    });
 
     api.storage.get('tempVersion').then(version => {
       let versionMsg = '';
@@ -382,7 +342,7 @@ export class Minimal {
 
 
               ${api.storage.lang('minimalClass_versionMsg_Text_2')}<br>
-              <a target="_blank" href="https://discordapp.com/invite/cTH4yaw">
+              <a target="_blank" href="https://discord.com/invite/cTH4yaw">
                 <img alt="Discord" src="https://img.shields.io/discord/358599430502481920.svg?style=flat-square&amp;logo=discord&amp;label=Discord&amp;colorB=7289DA">
               </a><br>
               <a target="_blank" href="https://github.com/MALSync/MALSync/issues">

@@ -1,33 +1,71 @@
+#malp {
+  all: initial;
+  font-size: inherit;
+  font-family: inherit;
+  margin-bottom: 8px;
+  min-height: 50px;
+  display: block;
+  .info {
+    all: initial !important;
+    font-size: inherit !important;
+    font-family: inherit !important;
+  }
+  select {
+    appearance: auto;
+  }
+}
+
 @import './../pages';
 
-@textColor: inherit;
-@activeEp: #cee1ff;
+@inputBackground: white;
+
+.style(@bg, @text) {
+  * {
+    color: @text !important;
+  }
+
+  #MalData {
+    justify-content: flex-start !important;
+    align-items: center !important;
+    gap: 10px;
+
+    select,
+    & > * > *:last-child,
+    & > * > a {
+      background-color: @bg !important;
+      border-radius: 4px;
+      padding: 4px 8px !important;
+    }
+
+    option {
+      background-color: @bg !important;
+    }
+
+    & > * > span {
+      display: block !important;
+    }
+    .info {
+      display: block !important;
+      font-size: 12px !important;
+    }
+
+    #AddMalDiv {
+      margin-left: 10px;
+      display: inline-block !important;
+      font-size: 0;
+      #AddMal {
+        font-size: 16px;
+      }
+    }
+  }
+}
 
 #malp {
-  margin: 0;
-  span {
-    color: @textColor;
-  }
-  select > * {
-    background-color: white !important;
-  }
+  .style(#f5f6f7, black);
 }
 
-@media only screen and (max-width: 1440px) {
+.theme--dark {
   #malp {
-    .MalLogin {
-      width: 100%;
-    }
-  }
-}
-
-.MALSyncDark {
-  #MalData {
-    select option {
-      background-color: black !important;
-    }
-  }
-  .mal-sync-active {
-    background-color: #0e1d35;
+    .style(#272727, white);
   }
 }

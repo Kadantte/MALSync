@@ -41,15 +41,19 @@ export async function apiCall(options: {
         throw this.errorObj(errorCode.ServerOffline, `Server Offline status: ${response.status}`);
       }
 
-      switch (response.status) {
-        case 400:
-          throw this.errorObj(errorCode.GenericError, 'Invalid Parameters');
-          break;
-        case 403:
-        default:
+      let res;
+      try {
+        res = JSON.parse(response.responseText);
+      } catch (e) {
+        if (response.responseText.includes('Request blocked')) {
+          throw this.errorObj(
+            errorCode.GenericError,
+            `Your IP has been banned on MAL, change your IP or wait for it to get unbanned`,
+          );
+        }
+        throw e;
       }
 
-      const res = JSON.parse(response.responseText);
       if (res && res.error) {
         switch (res.error) {
           case 'forbidden':
@@ -71,6 +75,14 @@ export async function apiCall(options: {
           default:
             throw this.errorObj(res.error, res.message ?? res.error);
         }
+      }
+
+      switch (response.status) {
+        case 400:
+          throw this.errorObj(errorCode.GenericError, 'Invalid Parameters');
+          break;
+        case 403:
+        default:
       }
 
       return res;

@@ -15,6 +15,12 @@ const tempObj = {
 
 export async function search(keyword, type: 'anime' | 'manga', options = {}, sync = false): Promise<searchInterface> {
   tempObj.type = type;
+
+  keyword = keyword.trim();
+  if (keyword.length > 64) {
+    keyword = keyword.substr(0, 64);
+  }
+
   return tempObj
     .apiCall({
       type: 'GET',
@@ -40,7 +46,7 @@ export async function search(keyword, type: 'anime' | 'manga', options = {}, syn
           malUrl: () => {
             return `https://myanimelist.net/${type}/${item.node.id}`;
           },
-          image: item.node.main_picture.medium,
+          image: item.node.main_picture?.medium ?? '',
           media_type: item.node.media_type
             ? (item.node.media_type.charAt(0) + item.node.media_type.slice(1).toLowerCase()).replace('_', ' ')
             : '',

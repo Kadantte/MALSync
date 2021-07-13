@@ -18,10 +18,19 @@ export const requestUserscriptLegacy: requestInterface = {
         method,
         url,
         synchronous: false,
-        headers: [],
+        headers: {},
         data: null,
         onload(response) {
           console.log(response);
+          if (response.status === 429) {
+            con.error('RATE LIMIT');
+            api.storage.set('rateLimit', true);
+            setTimeout(() => {
+              api.storage.set('rateLimit', false);
+              resolve(requestUserscriptLegacy.xhr(method, url));
+            }, 10000);
+            return;
+          }
           const responseObj: xhrResponseI = {
             finalUrl: response.finalUrl,
             responseText: response.responseText,
@@ -34,6 +43,13 @@ export const requestUserscriptLegacy: requestInterface = {
         request.url = url.url;
         request.headers = url.headers;
         request.data = url.data;
+      }
+      // @ts-ignore
+      if (request.url.includes('malsync.moe')) {
+        // @ts-ignore
+        request.headers.version = api.storage.version();
+        // @ts-ignore
+        request.headers.type = 'userscript';
       }
       GM_xmlhttpRequest(request);
     });

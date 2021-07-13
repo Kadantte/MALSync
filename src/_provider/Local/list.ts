@@ -10,6 +10,10 @@ export class UserList extends ListAbstract {
     return 'local';
   }
 
+  _getSortingOptions() {
+    return [];
+  }
+
   async getPart() {
     con.log('[UserList][Local]', `status: ${this.status}`);
     this.done = true;
@@ -33,6 +37,7 @@ export class UserList extends ListAbstract {
                 airingState: 2,
                 image: el.image ?? api.storage.assetUrl('questionmark.gif'),
                 malId: 0,
+                apiCacheKey: 0,
                 tags: el.tags,
                 title: `[L] ${el.name}`,
                 totalEp: 0,
@@ -54,6 +59,7 @@ export class UserList extends ListAbstract {
                 airingState: 2,
                 image: el.image ?? api.storage.assetUrl('questionmark.gif'),
                 malId: 0,
+                apiCacheKey: 0,
                 tags: el.tags,
                 title: `[L] ${el.name}`,
                 totalEp: 0,

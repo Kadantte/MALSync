@@ -1,41 +1,54 @@
 import { pageInterface } from '../pageInterface';
+import { ScriptProxy } from '../../utils/scriptProxy';
 
 let item: any;
 
-async function getApiKey() {
-  return api.storage.get('Plex_Api_Key');
-}
+const proxy = new ScriptProxy();
+proxy.addCaptureVariable(
+  'auth',
+  `
+    if (window.hasOwnProperty("localStorage")) {
+      return {
+        apiKey: window.localStorage.myPlexAccessToken,
+        users: window.localStorage.users
+      }
+    } else {
+      return undefined;
+    }
+  `,
+);
 
-async function setApiKey(key) {
-  return api.storage.set('Plex_Api_Key', key);
-}
+const auth: {
+  apiKey: null | string;
+  serverApiKey: null | string;
+  base: null | string;
+} = {
+  apiKey: null,
+  serverApiKey: null,
+  base: null,
+};
 
-async function getBase() {
-  return api.storage.get('Plex_Base');
-}
+let loadInterval;
 
-async function setBase(key) {
-  return api.storage.set('Plex_Base', key);
-}
-
-async function urlChange(page, curUrl = window.location.href, player = false) {
+async function urlChange(page) {
+  window.clearInterval(loadInterval);
+  page.reset();
   $('html').addClass('miniMAL-hide');
+  let curUrl: string = window.location.href;
+  if ($('[class*="MetadataPosterTitle-isSecondary"] [data-qa-id="metadataTitleLink"]').attr('href')) {
+    curUrl = $('[class*="MetadataPosterTitle-isSecondary"] [data-qa-id="metadataTitleLink"]').attr('href')!;
+  }
+
   const path = String(utils.urlParam(curUrl, 'key'));
   if (!path) return;
   if (!(path.indexOf('metadata') !== -1)) return;
 
   apiCall(decodeURIComponent(path)).then(response => {
-    if (response.status !== 200) {
-      con.error('No Api Key');
-      $('html').addClass('noApiKey');
-      return;
-    }
     let data;
     try {
       data = JSON.parse(response.responseText);
     } catch (e) {
       con.error(e);
-      $('html').addClass('noApiKey');
       return;
     }
 
@@ -45,10 +58,31 @@ async function urlChange(page, curUrl = window.location.href, player = false) {
     }
 
     item = data.MediaContainer.Metadata[0];
+
     switch (item.type) {
       case 'show':
         con.log('Show', data);
-        utils.waitUntilTrue(
+
+        if (!item.skipChildren) {
+          con.log('Series overview. Dont do anything');
+          item = undefined;
+          return;
+        }
+
+        loadInterval = utils.waitUntilTrue(
+          function() {
+            return j.$('[data-qa-id="preplay-mainTitle"]').length;
+          },
+          function() {
+            page.UILoaded = false;
+            page.handlePage(curUrl);
+            $('html').removeClass('miniMAL-hide');
+          },
+        );
+        break;
+      case 'season':
+        con.log('Season', data);
+        loadInterval = utils.waitUntilTrue(
           function() {
             return j.$('[data-qa-id="preplay-mainTitle"]').length;
           },
@@ -61,10 +95,8 @@ async function urlChange(page, curUrl = window.location.href, player = false) {
         break;
       case 'episode':
         con.log('Episode', data);
-        if (player) {
-          page.handlePage(curUrl);
-          $('html').removeClass('miniMAL-hide');
-        }
+        page.handlePage(curUrl);
+        $('html').removeClass('miniMAL-hide');
         break;
       default:
         con.log('Not recognized', data);
@@ -73,22 +105,116 @@ async function urlChange(page, curUrl = window.location.href, player = false) {
 }
 
 // Helper
-async function apiCall(url, apiKey = null, base = null) {
-  if (apiKey === null) apiKey = await getApiKey();
-  if (base === null) base = await getBase();
+async function apiCall(url) {
+  if (!auth.apiKey || !auth.base) await authenticate();
   let pre;
   if (url.indexOf('?') !== -1) {
     pre = '&';
   } else {
     pre = '?';
   }
-  url = `${base + url + pre}X-Plex-Token=${apiKey}`;
-  con.log('Api Call', url);
-  return api.request.xhr('GET', {
-    url,
-    headers: {
-      Accept: 'application/json',
-    },
+  const reqUrl = `${auth.base + url + pre}X-Plex-Token=${auth.apiKey}`;
+  con.log('Api Call', reqUrl);
+  return api.request
+    .xhr('GET', {
+      url: reqUrl,
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+    .then(response => {
+      if (response.status !== 200) {
+        if (!auth.serverApiKey) throw 'Could not authenticate';
+        auth.apiKey = auth.serverApiKey;
+        auth.serverApiKey = null;
+        con.log('Use server apikey');
+        return apiCall(url);
+      }
+      return response;
+    });
+}
+
+async function authenticate() {
+  const logger = con.m('auth');
+  logger.log('Start');
+  return new Promise((resolve, reject) => {
+    proxy.addProxy(async (caller: ScriptProxy) => {
+      try {
+        const tempAuth: any = proxy.getCaptureVariable('auth');
+        if (!tempAuth) throw 'authInfo not found';
+
+        if (!tempAuth.users) throw 'users not found';
+        const users = JSON.parse(tempAuth.users);
+
+        if (!tempAuth.apiKey) {
+          if (
+            users &&
+            users.users &&
+            users.users.length &&
+            (!users.users[0].servers.length || typeof users.users[0].servers[0].accessToken === 'undefined')
+          ) {
+            logger.log('Switching to no account mode');
+
+            auth.apiKey = null;
+            auth.serverApiKey = null;
+            auth.base = window.location.origin;
+
+            resolve('');
+            return;
+          }
+
+          throw 'apiKey not found';
+        }
+        auth.apiKey = tempAuth.apiKey;
+
+        const user = users.users.find(el => el.authToken === auth.apiKey);
+        if (!user) throw 'User not found';
+        logger.log('User found', user.id);
+        const serverId = user.lastPrimaryServerID;
+        logger.log('Server', serverId);
+        const server = user.servers.find(el => el.machineIdentifier === serverId);
+        if (!server) throw 'Server not found';
+        auth.serverApiKey = server.accessToken;
+        logger.log('Connections', server.connections);
+        if (!server.connections.length) throw 'No connection found';
+
+        // We try to get one working connection uri
+        let connection = server.connections[0];
+        if (server.connections.length > 1) {
+          for (let i = 0; i < server.connections.length; i += 1) {
+            const url = server.connections[i].uri;
+            logger.log(`Trying ${url}`);
+
+            try {
+              // eslint-disable-next-line no-await-in-loop
+              const data = await api.request.xhr('GET', {
+                url: `${url}/library/sections?X-Plex-Token=${auth.apiKey}`,
+                headers: {
+                  Accept: 'application/json',
+                },
+              });
+
+              if (data.status !== 200) {
+                throw 'Not reached';
+              }
+
+              logger.log(`Reached ${url}`);
+              connection = server.connections[i];
+              break;
+            } catch (e) {
+              logger.log(`Ignoring unreachable server url ${url}`);
+            }
+          }
+        }
+
+        auth.base = connection.uri;
+        logger.log('Done', auth);
+        resolve('');
+      } catch (e) {
+        logger.error(e);
+        reject(e);
+      }
+    });
   });
 }
 
@@ -98,7 +224,7 @@ export const Plex: pageInterface = {
   languages: ['Many'],
   type: 'anime',
   isSyncPage(url) {
-    if (item.type === 'episode') {
+    if (item && item.type === 'episode') {
       return true;
     }
     return false;
@@ -113,12 +239,17 @@ export const Plex: pageInterface = {
       return item.key.split('/')[3];
     },
     getOverviewUrl(url) {
-      return (
-        Plex.domain +
-        $('[class^="AudioVideoPlayerView"] [class*="MetadataPosterTitle"][data-qa-id="metadataTitleLink"]')
-          .first()
-          .attr('href')!
-      );
+      let base = window.location.href.split('?')[0];
+      if (!base.includes('server/')) {
+        const href =
+          window.location.href.split('#')[0] +
+          j
+            .$('[href^="#!/server"]')
+            .first()
+            .attr('href');
+        base = href.split('?')[0];
+      }
+      return `${base}?key=/library/metadata/${Plex.sync.getIdentifier(url)}`;
     },
     getEpisode(url) {
       return item.index;
@@ -126,6 +257,7 @@ export const Plex: pageInterface = {
   },
   overview: {
     getTitle(url) {
+      if (item.parentTitle) return item.parentTitle;
       return item.title;
     },
     getIdentifier(url) {
@@ -140,80 +272,16 @@ export const Plex: pageInterface = {
   init(page) {
     api.storage.addStyle(require('!to-string-loader!css-loader!less-loader!./style.less').toString());
 
-    utils.changeDetect(
-      () => {
-        const href = $('[href*="X-Plex-Token"]').attr('href');
-        const apiBase = href!
-          .split('/')
-          .splice(0, 3)
-          .join('/');
-        const apiKey = utils.urlParam(href, 'X-Plex-Token');
-        con.info('Set Api', apiBase, apiKey);
-        setApiKey(apiKey);
-        setBase(apiBase);
-        if ($('html.noApiKey').length) {
-          $('html').removeClass('noApiKey');
-          if (
-            !$('[class^="AudioVideoPlayerView"] [class*="MetadataPosterTitle"] [data-qa-id="metadataTitleLink"]').length
-          ) {
-            urlChange(page);
-          } else {
-            page.reset();
-            const metaUrl = $(
-              '[class^="AudioVideoPlayerView"] [class*="MetadataPosterTitle"] [data-qa-id="metadataTitleLink"]',
-            )
-              .first()
-              .attr('href');
-            if (typeof metaUrl === 'undefined') return;
-            urlChange(page, Plex.domain + metaUrl, true);
-          }
-        }
-      },
-      () => {
-        const src = $('[href*="X-Plex-Token"]').length;
-        return src;
-      },
-    );
-
-    utils.urlChangeDetect(function() {
-      if (
-        !$('[class^="AudioVideoPlayerView"] [class*="MetadataPosterTitle"] [data-qa-id="metadataTitleLink"]').length
-      ) {
-        urlChange(page);
-      }
-    });
-
     j.$(document).ready(function() {
-      if (
-        !$('[class^="AudioVideoPlayerView"] [class*="MetadataPosterTitle"] [data-qa-id="metadataTitleLink"]').length
-      ) {
-        urlChange(page);
-      }
+      urlChange(page);
     });
 
     utils.changeDetect(
+      () => urlChange(page),
       () => {
-        page.reset();
-        if (
-          !$('[class^="AudioVideoPlayerView"] [class*="MetadataPosterTitle"] [data-qa-id="metadataTitleLink"]').length
-        ) {
-          urlChange(page);
-          return;
-        }
-        const metaUrl = $(
-          '[class^="AudioVideoPlayerView"] [class*="MetadataPosterTitle"] [data-qa-id="metadataTitleLink"]',
-        )
-          .first()
-          .attr('href');
-        if (typeof metaUrl === 'undefined') return;
-        urlChange(page, Plex.domain + metaUrl, true);
-      },
-      () => {
-        const src = $('[class^="AudioVideoPlayerView"] [class*="MetadataPosterTitle"] [data-qa-id="metadataTitleLink"]')
-          .first()
-          .attr('href');
-        if (typeof src === 'undefined') return 'NaN';
-        return src;
+        const epUrl = $('[class*="MetadataPosterTitle-isSecondary"] [data-qa-id="metadataTitleLink"]').attr('href');
+        if (epUrl) return epUrl;
+        return String(utils.urlParam(window.location.href, 'key'));
       },
     );
 
@@ -227,5 +295,33 @@ export const Plex: pageInterface = {
         $('html').removeClass('miniMAL-Fullscreen');
       }
     });
+
+    setInterval(() => {
+      if (Plex.isSyncPage(page.url)) {
+        if (!$('video').length) {
+          const seekbar = $('[class*="SeekBar-seekBar-"] [aria-valuemax]').first();
+          if (!seekbar) {
+            con.m('Player').log('no seekbar');
+            return;
+          }
+          const total = seekbar.attr('aria-valuemax');
+          const cur = seekbar.attr('aria-valuenow');
+          const playing = Boolean($('[data-qa-id="pauseButton"]').length);
+          con.m('Player').debug(cur, total, !playing);
+          if (total && cur) {
+            page.setVideoTime(
+              {
+                current: cur,
+                duration: total,
+                paused: !playing,
+              },
+              () => {
+                con.log('Not supported during chromecast');
+              },
+            );
+          }
+        }
+      }
+    }, 1000);
   },
 };

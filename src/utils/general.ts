@@ -1,5 +1,3 @@
-import { Cache } from './Cache';
-
 declare let browser: any;
 
 export function urlPart(url: string, part: number) {
@@ -10,6 +8,10 @@ export function urlPart(url: string, part: number) {
   if (!urlParts[part]) return '';
 
   return urlParts[part].replace(/[#?].*/, '');
+}
+
+export function urlStrip(url: string) {
+  return url.replace(/[#?].*/, '');
 }
 
 export function urlParam(url, name) {
@@ -39,8 +41,11 @@ export function generateUniqueID(arraySize = 10): string {
 }
 
 export function favicon(domain) {
-  if (domain.indexOf('pahe.win') !== -1) return `https://www.google.com/s2/favicons?domain=animepahe.com`;
-  return `https://www.google.com/s2/favicons?domain=${domain}`;
+  const res = domain.match(/^(https?:\/\/)?[^/]+/);
+
+  if (res) domain = res[0];
+
+  return `https://favicon.malsync.moe/?domain=${domain}`;
 }
 
 export function watching(type: 'anime' | 'manga') {
@@ -109,11 +114,12 @@ export function urlChangeDetect(callback) {
   }, 100);
 }
 
-export function fullUrlChangeDetect(callback) {
+export function fullUrlChangeDetect(callback, strip = false) {
   let currentPage = '';
   const intervalId = setInterval(function() {
-    if (currentPage !== window.location.href) {
-      currentPage = window.location.href;
+    const url = strip ? urlStrip(window.location.href) : window.location.href;
+    if (currentPage !== url) {
+      currentPage = url;
       callback();
     }
   }, 100);
@@ -143,6 +149,26 @@ export function waitUntilTrue(condition: Function, callback: Function, interval 
   }, interval);
 
   return intervalId;
+}
+
+export function getAsyncWaitUntilTrue(condition: Function, interval = 100) {
+  let intervalId;
+  let rejectThis;
+  const reset = () => {
+    clearTimeout(intervalId);
+    if (rejectThis) rejectThis('AsyncWait stopped');
+  };
+
+  return {
+    asyncWaitUntilTrue: () => {
+      reset();
+      return new Promise<void>((resolve, reject) => {
+        rejectThis = reject;
+        intervalId = waitUntilTrue(condition, () => resolve(), interval);
+      });
+    },
+    reset,
+  };
 }
 
 const doubleId = Math.random();
@@ -232,9 +258,15 @@ export async function setEntrySettings(type, id, options, tags = '') {
       // No TAG mode
       await api.storage.set(`tagSettings/${type}/${id}`, JSON.stringify(tempOptions));
     }
-  } else {
-    tags = setUrlInTags('', tags);
   }
+
+  if (!Object.values(tempOptions).find(el => Boolean(el))) {
+    tags = setUrlInTags('', tags);
+    if (!api.settings.get('malTags')) {
+      await api.storage.remove(`tagSettings/${type}/${id}`);
+    }
+  }
+
   return tags;
 }
 
@@ -289,118 +321,6 @@ export async function getEntrySettings(type, id, tags = '') {
 export function handleMalImages(url) {
   if (url.indexOf('questionmark') !== -1) return api.storage.assetUrl('questionmark.gif');
   return url;
-}
-
-export async function getMalToKissArray(type, id) {
-  if (!id) return {};
-  return getMalToKissApi(type, id).catch(e => {
-    con.error(e);
-    return getMalToKissFirebase(type, id);
-  });
-}
-
-export async function getPageSearch() {
-  const cacheObj = new Cache('pageSearch', 12 * 60 * 60 * 1000);
-  if (!(await cacheObj.hasValueAndIsNotEmpty())) {
-    con.log('Getting new PageSearch Cache');
-    const url = 'https://api.malsync.moe/general/pagesearch';
-    const request = await api.request.xhr('GET', url).then(async response => {
-      if (response.status === 200 && response.responseText) {
-        return JSON.parse(response.responseText);
-      }
-      return {};
-    });
-    await cacheObj.setValue(request);
-    return request;
-  }
-  con.log('PageSearch Cached');
-  return cacheObj.getValue();
-}
-
-export async function getMalToKissApi(type, id) {
-  const url = `https://api.malsync.moe/mal/${type}/${id}`;
-  return api.request.xhr('GET', url).then(async response => {
-    con.log('malSync response', response);
-    if (response.status === 400) {
-      return {};
-    }
-    if (response.status === 200) {
-      const data = JSON.parse(response.responseText);
-      for (const pageKey in data.Sites) {
-        if (!api.settings.get(pageKey)) {
-          con.log(`${pageKey} is deactivated`);
-          delete data.Sites[pageKey];
-          continue;
-        }
-      }
-      if (data && data.Sites) return data.Sites;
-      return {};
-    }
-    throw new Error('malsync offline');
-  });
-}
-
-export async function getMalToKissFirebase(type, id) {
-  return new Promise((resolve, reject) => {
-    const url = `https://kissanimelist.firebaseio.com/Data2/Mal${type}/${id}/Sites.json`;
-    api.request.xhr('GET', url).then(async response => {
-      const json = j.$.parseJSON(response.responseText);
-
-      for (const pageKey in json) {
-        const page = json[pageKey];
-
-        if (!api.settings.get(pageKey)) {
-          con.log(`${pageKey} is deactivated`);
-          delete json[pageKey];
-          continue;
-        }
-
-        for (const streamKey in page) {
-          const stream = page[streamKey];
-
-          const streamUrl = `https://kissanimelist.firebaseio.com/Data2/${stream}/${encodeURIComponent(
-            streamKey,
-          )}.json`;
-
-          const cache = await api.storage.get(`MalToKiss/${stream}/${encodeURIComponent(streamKey)}`);
-          let streamJson;
-
-          if (
-            typeof cache !== 'undefined' &&
-            cache !== null &&
-            cache.constructor === Object &&
-            Object.keys(cache).length !== 0
-          ) {
-            streamJson = cache;
-          } else {
-            const streamRespose = await api.request.xhr('GET', streamUrl);
-
-            if (streamRespose) streamJson = j.$.parseJSON(streamRespose.responseText);
-
-            api.storage.set(`MalToKiss/${stream}/${encodeURIComponent(streamKey)}`, streamJson);
-          }
-          if (!streamJson) {
-            con.error(`[K2M] ${pageKey}/${streamKey} not found`);
-            delete json[pageKey][streamKey];
-            continue;
-          }
-          if (!(id in streamJson.Mal)) {
-            con.error('[K2M] Wrong mal id', streamJson);
-            delete json[pageKey][streamKey];
-            continue;
-          }
-          if (pageKey === 'Crunchyroll') {
-            streamJson.url = `${streamJson.url}?season=${streamKey}`;
-          }
-
-          json[pageKey][streamKey] = streamJson;
-        }
-      }
-
-      con.log('Mal2Kiss', json);
-      resolve(json);
-    });
-  });
 }
 
 export function getTooltip(text, style = '', direction = 'top') {
@@ -736,6 +656,16 @@ function initflashm() {
                  #flashinfo-div:hover, #flashinfo-div.hover{
                   z-index: 2147483647;
                  }
+                 #flashinfo-div.player-error {
+                   z-index: 2147483647;
+                 }
+                 #flashinfo-div.player-error .type-update{
+                  overflow: visible !important;
+                  opacity: 1 !important;
+                 }
+                 #flashinfo-div.player-error .player-error{
+                  display: block !important
+                 }
 
                  #flash-div-top, #flash-div-bottom, #flashinfo-div{
                     font-family: "Helvetica","Arial",sans-serif;
@@ -863,4 +793,12 @@ export function pageUrl(page: 'mal' | 'anilist' | 'kitsu' | 'simkl', type: 'anim
     default:
       throw `${page} not a valid page`;
   }
+}
+
+export function returnYYYYMMDD(numFromToday = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + numFromToday);
+  const month = d.getMonth() < 9 ? `0${d.getMonth() + 1}` : d.getMonth() + 1;
+  const day = d.getDate() < 10 ? `0${d.getDate()}` : d.getDate();
+  return `${d.getFullYear()}-${month}-${day}`;
 }

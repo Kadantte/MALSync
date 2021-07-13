@@ -9,6 +9,8 @@ import { Single as LocalSingle } from '../Local/single';
 import { getCacheKey } from '../singleFactory';
 import { RulesClass } from './rulesClass';
 
+import { getSyncMode } from '../helper';
+
 interface SearchResult {
   id?: number;
   url: string;
@@ -225,18 +227,30 @@ export class SearchClass {
     }
 
     if ((result && result.provider !== 'firebase') || !result) {
-      result = searchCompare(result, await this.malSearch());
+      try {
+        result = searchCompare(result, await this.malSearch());
+      } catch (e) {
+        this.logger.m(e);
+      }
     }
 
     if ((result && result.provider !== 'firebase') || !result) {
-      result = searchCompare(result, await this.pageSearch(), 0.5);
+      try {
+        result = searchCompare(result, await this.pageSearch(), 0.5);
+      } catch (e) {
+        this.logger.m(e);
+      }
     }
 
     if (result && result.provider === 'firebase' && api.settings.get('syncMode') !== 'MAL' && !result.url) {
-      const temp = await this.pageSearch();
-      if (temp && !(temp.url.indexOf('myanimelist.net') !== -1) && temp.similarity.same) {
-        this.logger.log('Ignore Firebase', result);
-        result = temp;
+      try {
+        const temp = await this.pageSearch();
+        if (temp && !(temp.url.indexOf('myanimelist.net') !== -1) && temp.similarity.same) {
+          this.logger.log('Ignore Firebase', result);
+          result = temp;
+        }
+      } catch (e) {
+        this.logger.m(e);
       }
     }
 
@@ -314,8 +328,14 @@ export class SearchClass {
 
     const res = JSON.parse(response.responseText);
 
+    let pageUrl = res.malUrl;
+
+    if (!pageUrl && res.aniUrl && getSyncMode(this.getNormalizedType()) === 'ANILIST') {
+      pageUrl = res.aniUrl;
+    }
+
     return {
-      url: res.malUrl,
+      url: pageUrl,
       offset: 0,
       provider: 'firebase',
       similarity: {

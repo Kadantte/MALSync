@@ -287,6 +287,10 @@
       }
     }
   },
+  "syncPage_flash_player_error": {
+    "message": "Player not detected. Please manually update it here.",
+    "description": "Message if the video player could not be recognized"
+  },
   "syncPage_malObj_addAnime": {
     "message": "Add to $page$",
     "description": "add anime",
@@ -880,14 +884,6 @@
     "message": "Disables the content script. This makes it possible to have the extension and userscript enabled at the same time.",
     "description": "Userscript mode - Text"
   },
-  "settings_StrictCookies": {
-    "message": "Strict Cookies",
-    "description": "Strict Cookies"
-  },
-  "settings_StrictCookies_Text": {
-    "message": "This option adds Firefox Multi-Account Containers support. Make sure to restart the browser after enabling this option",
-    "description": "Strict Cookies - Text"
-  },
   "settings_highlightAllEp": {
     "message": "Highlight all Episodes/Chapters",
     "description": "Highlight all Episodes/Chapters"
@@ -1127,5 +1123,21 @@
   "nextEpShort_no_nextEp": {
     "message": "Couldn't find the next episode",
     "description": "Error message if no next episode could be found after pressing the next episode shortcut"
+  },
+  "settings_filler": {
+    "message": "Check for filler/recap episodes",
+    "description": "Option to enable filler checking"
+  },
+  "settings_filler_text": {
+    "message": "This will check if the episode is marked as a filler/recap on MyAnimeList",
+    "description": "filler tooltip"
+  },
+  "filler_filler_confirm": {
+    "message": "This episode has been marked as a filler on MyAnimeList, do you want to skip?",
+    "description": "Question if the user wants to skip the filler"
+  },
+  "filler_recap_confirm": {
+    "message": "This episode has been marked as a recap on MyAnimeList, do you want to skip?",
+    "description": "Question if the user wants to skip the recap"
   }
 }

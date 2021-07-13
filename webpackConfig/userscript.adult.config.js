@@ -33,7 +33,7 @@ const metadata = {
   name: `${package['productName']} Adult [FateXXXBlood Edition]`,
   namespace: 'https://greasyfork.org/users/92233',
   description: package['description'],
-  version: '0.2.3',
+  version: '0.2.9',
   author: package['author'],
   license: 'GPL-3.0',
   iconURL:
@@ -58,7 +58,7 @@ const metadata = {
     generateMatchExcludes(playerUrls).match,
   ),
   exclude: generateMatchExcludes(pageUrls).exclude,
-  'require ': 'http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js',
+  'require ': 'http://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js',
   resource: generateResources(),
   'run-at': 'document_start',
   connect: [
