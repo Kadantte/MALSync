@@ -1,0 +1,32 @@
+{
+    "title": "Madarascans",
+    "url": "https://madarascans.net",
+    "testCases": [
+      {
+        "url": "https://madarascans.net/warrior-cariel-chapter-11/",
+        "expected": {
+          "sync": true,
+          "title": "Warrior Cariel",
+          "identifier": "warrior-cariel",
+          "overviewUrl": "https://madarascans.net/series/warrior-cariel/",
+          "episode": 11,
+          "nextEpUrl": "https://madarascans.net/warrior-cariel-chapter-12/",
+          "uiSelector": false
+        }
+      },
+      {
+        "url": "https://madarascans.net/series/warrior-cariel/",
+        "expected": {
+          "sync": false,
+          "title": "Warrior Cariel",
+          "identifier": "warrior-cariel",
+          "image": "https://i0.wp.com/madarascans.net/wp-content/uploads/2025/08/2025-08-06-06-54-56-1754506496957.jpg",
+          "uiSelector": true,
+          "epList": {
+            "4" : "https://madarascans.net/warrior-cariel-chapter-4/",
+            "12": "https://madarascans.net/warrior-cariel-chapter-12/"
+         }
+        }
+      }
+    ]
+  }

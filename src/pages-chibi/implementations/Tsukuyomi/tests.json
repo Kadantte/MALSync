@@ -1,0 +1,67 @@
+{
+  "title": "Tsukuyomi",
+  "url": "https://tsukuyomi.tv",
+  "testCases": [
+    {
+      "url": "https://tsukuyomi.tv/watch/sousou-no-frieren-2nd-season-JKwG5e/9",
+      "expected": {
+        "sync": true,
+        "title": "Frieren: Beyond Journey's End Season 2",
+        "identifier": "JKwG5e",
+        "overviewUrl": "https://tsukuyomi.tv/anime/sousou-no-frieren-2nd-season-JKwG5e",
+        "episode": 9,
+        "image": "https://cdn.myanimelist.net/images/anime/1921/154528.jpg",
+        "nextEpUrl": "https://tsukuyomi.tv/watch/sousou-no-frieren-2nd-season-JKwG5e/10",
+        "uiSelector": false,
+        "epList": {
+          "1": "https://tsukuyomi.tv/watch/sousou-no-frieren-2nd-season-JKwG5e/1",
+          "9": "https://tsukuyomi.tv/watch/sousou-no-frieren-2nd-season-JKwG5e/9"
+        }
+      }
+    },
+    {
+      "url": "https://tsukuyomi.tv/watch/sousou-no-frieren-2nd-season-JKwG5e/10",
+      "expected": {
+        "sync": true,
+        "title": "Frieren: Beyond Journey's End Season 2",
+        "identifier": "JKwG5e",
+        "overviewUrl": "https://tsukuyomi.tv/anime/sousou-no-frieren-2nd-season-JKwG5e",
+        "episode": 10,
+        "image": "https://cdn.myanimelist.net/images/anime/1921/154528.jpg",
+        "nextEpUrl": null,
+        "uiSelector": false,
+        "epList": {
+          "1": "https://tsukuyomi.tv/watch/sousou-no-frieren-2nd-season-JKwG5e/1",
+          "9": "https://tsukuyomi.tv/watch/sousou-no-frieren-2nd-season-JKwG5e/9"
+        }
+      }
+    },
+    {
+      "url": "https://tsukuyomi.tv/watch/death-note-Ifl5z-/1",
+      "expected": {
+        "sync": true,
+        "title": "Death Note",
+        "identifier": "Ifl5z-",
+        "overviewUrl": "https://tsukuyomi.tv/anime/death-note-Ifl5z-",
+        "episode": 1,
+        "image": "https://cdn.myanimelist.net/images/anime/1079/138100l.jpg",
+        "nextEpUrl": "https://tsukuyomi.tv/watch/death-note-Ifl5z-/2",
+        "uiSelector": false
+      }
+    },
+    {
+      "url": "https://tsukuyomi.tv/anime/sousou-no-frieren-2nd-season-JKwG5e",
+      "expected": {
+        "sync": false,
+        "title": "Frieren: Beyond Journey's End Season 2",
+        "identifier": "JKwG5e",
+        "image": "https://cdn.myanimelist.net/images/anime/1921/154528.jpg",
+        "uiSelector": true,
+        "epList": {
+          "1": "https://tsukuyomi.tv/watch/sousou-no-frieren-2nd-season-JKwG5e/1",
+          "7": "https://tsukuyomi.tv/watch/sousou-no-frieren-2nd-season-JKwG5e/7"
+        }
+      }
+    }
+  ]
+}

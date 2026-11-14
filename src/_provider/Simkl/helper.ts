@@ -1,14 +1,19 @@
+import { status } from '../definitions';
 import { NotAutenticatedError, parseJson, ServerOfflineError } from '../Errors';
 
-export const client_id = '39e8640b6f1a60aaf60f3f3313475e830517badab8048a4e52ff2d10deb2b9b0';
+export const client_id = __MAL_SYNC_KEYS__.simkl.id;
+
+export function getAuthUrl() {
+  return `https://simkl.com/oauth/authorize?response_type=code&client_id=${client_id}&redirect_uri=https://simkl.com/apps/chrome/mal-sync/connected/`;
+}
 
 export function translateList(simklStatus, malStatus: null | number = null) {
   const list = {
-    watching: 1,
-    plantowatch: 6,
-    completed: 2,
-    notinteresting: 4,
-    hold: 3,
+    watching: status.Watching,
+    plantowatch: status.PlanToWatch,
+    completed: status.Completed,
+    notinteresting: status.Dropped,
+    hold: status.Onhold,
   };
   if (malStatus !== null) {
     return Object.keys(list).find(key => list[key] === malStatus);
@@ -21,6 +26,15 @@ export function getCacheKey(id, simklId) {
     return `simkl:${simklId}`;
   }
   return id;
+}
+
+export function simklIdToMal(simklId) {
+  return this.call(`https://api.simkl.com/anime/${simklId}`, { extended: 'full' }, true).then(
+    res => {
+      if (typeof res.ids.mal === 'undefined') return null;
+      return res.ids.mal;
+    },
+  );
 }
 
 export function getEpisode(episode: string): number {
@@ -104,7 +118,10 @@ export async function syncList(lazy = false) {
   return cacheList;
 }
 
-export async function getSingle(ids: { simkl?: string | number; mal?: string | number }, lazy = false) {
+export async function getSingle(
+  ids: { simkl?: string | number; mal?: string | number },
+  lazy = false,
+) {
   const list = await this.syncList(lazy);
   if (ids.simkl) {
     if (list[ids.simkl] !== undefined) {
@@ -125,7 +142,13 @@ export async function getSingle(ids: { simkl?: string | number; mal?: string | n
   return null;
 }
 
-export async function call(url, sData: any = {}, asParameter = false, method: 'GET' | 'POST' = 'GET', login = true) {
+export async function call(
+  url,
+  sData: any = {},
+  asParameter = false,
+  method: 'GET' | 'POST' = 'GET',
+  login = true,
+) {
   const logger = con.m('Simkl', '#9b7400').m('call');
 
   if (asParameter) {
@@ -143,6 +166,10 @@ export async function call(url, sData: any = {}, asParameter = false, method: 'G
   if (login) headers.Authorization = `Bearer ${api.settings.get('simklToken')}`;
   else logger.log('No login');
 
+  if (method === 'GET') {
+    sData = undefined;
+  }
+
   return api.request
     .xhr(method, {
       url,
@@ -150,6 +177,9 @@ export async function call(url, sData: any = {}, asParameter = false, method: 'G
       data: sData,
     })
     .then(async response => {
+      if ((response.status > 499 && response.status < 600) || response.status === 0) {
+        throw new ServerOfflineError(`Server Offline status: ${response.status}`);
+      }
       const res = parseJson(response.responseText);
       this.errorHandling(res, response.status);
       return res;

@@ -1,7 +1,7 @@
 const { expect } = require('chai');
-const puppeteer = require('puppeteer-extra');
-const pluginStealth = require('puppeteer-extra-plugin-stealth');
-const AdblockerPlugin = require('puppeteer-extra-plugin-adblocker');
+const puppeteer = require('puppeteer');
+const { openPage, injectTestEnvironment } = require('./browser');
+const path = require('path');
 
 const fs = require('fs');
 const dir = require('node-dir');
@@ -10,6 +10,12 @@ const script = fs.readFileSync(`${__dirname}/../dist/testCode.js`, 'utf8');
 
 const testsArray = [];
 let changedFiles = [];
+let OnlyPage = null;
+
+if (process.argv && process.argv.length > 2) {
+  console.log('Page to test:', process.argv[2]);
+  OnlyPage = process.argv[2];
+}
 
 if (process.env.FILES) {
   changedFiles = JSON.parse(process.env.FILES.replace(/\\/g, '/'));
@@ -18,8 +24,8 @@ if (process.env.FILES) {
 
 // Define global variables
 let browser;
-let browserFull;
 const debugging = false;
+let headless = OnlyPage && !process.env.CI ? false : true;
 let buildFailed = false;
 const mode = {
   quiet: false,
@@ -29,25 +35,17 @@ const mode = {
 
 if (process.env.CI && !changedFiles.length) mode.quiet = true;
 
-puppeteer.use(pluginStealth());
-puppeteer.use(AdblockerPlugin());
+async function getBrowser() {
+  if (browser) return browser;
 
-async function getBrowser(headless = true) {
-  if (browser && headless) return browser;
-  if (browserFull && !headless) return browserFull;
+  const tempBrowser = await puppeteer.launch({ headless: headless ? 'new' : false, args: ['--disable-web-security'] });
+  browser = tempBrowser;
 
-  const tempBrowser = await puppeteer.launch({ headless });
-  if (headless) {
-    browser = tempBrowser;
-  } else {
-    browserFull = tempBrowser;
-  }
   return tempBrowser;
 }
 
 async function closeBrowser() {
   if (browser) await browser.close();
-  if (browserFull) await browserFull.close();
 }
 
 const logBlocks = {};
@@ -120,6 +118,10 @@ async function cdn(page, type) {
     }
 
     setTimeout(async () => {
+      if (page.isClosed()) {
+        reject('Page closed');
+        return;
+      }
       const content = await page.evaluate(() => document.body.innerHTML);
       if (content.indexOf('Why do I have to complete a CAPTCHA?') !== -1) {
         reject('Captcha');
@@ -132,33 +134,230 @@ async function cdn(page, type) {
 async function onlineTest(url, page) {
   const [response] = await Promise.all([await page.goto(url, { waitUntil: 'networkidle0' })]);
 
-  if (parseInt(response.headers().status) !== 200) {
+  if (parseInt(response.status()) !== 200) {
     const content = await page.evaluate(() => document.body.innerHTML);
     if (content.indexOf('Why do I have to complete a CAPTCHA?') !== -1) {
       throw 'Captcha';
     }
-    throw response.headers().status;
+    throw response.status();
   }
 }
 
-async function singleCase(block, test, page, retry = 0) {
-  try {
-    const [response] = await Promise.all([
-      page.goto(test.url, { timeout: 0 }),
-      page.waitForNavigation({ timeout: 30000 }),
-    ]);
-  } catch (e) {
-    log(block, 'Page loads too long', 2);
-    await page.evaluate(() => window.stop());
+function safeFileName(filename) {
+  return encodeURIComponent(filename.replace(/(^\/|\/$| )/g, '').replace(/\//g, '_')).toLowerCase();
+}
+
+function getRequestName(message) {
+  let url;
+  let requestBody = '';
+
+  if (typeof message.url === 'object') {
+    url = message.url.url;
+    if (message.url.data) {
+      requestBody = JSON.stringify(message.url.data);
+    }
+  } else {
+    url = message.url;
   }
 
-  await page
-    .addScriptTag({
-      content: fs.readFileSync(`./node_modules/jquery/dist/jquery.min.js`, 'utf8'),
-    })
-    .catch(() => {
-      throw 'jquery could not be loaded';
+  const urlObj = new URL(url);
+  return safeFileName(urlObj.pathname + urlObj.search + urlObj.hash + requestBody);
+}
+
+async function PreparePage(block, page, url, testPage) {
+  const urlObj = new URL(url);
+  let name = safeFileName(urlObj.pathname + urlObj.search + urlObj.hash);
+
+  checkIfFolderExists(block, name);
+  const pagePath = path.join(__dirname, '../dist/headless/clear/', block, name);
+  const filePath = path.join(pagePath, 'index.html');
+
+  if (fs.existsSync(filePath)) {
+    log(block, 'Cached', 2);
+
+    await page.setRequestInterception(true);
+    await page.setBypassServiceWorker(true);
+
+    page.on('request', (request) => {
+      if (!request.isInterceptResolutionHandled()) {
+        if (request.url().startsWith('https://chibi.malsync.moe/config/')) {
+          const pathPart = request
+            .url()
+            .replace('https://chibi.malsync.moe/config/', '')
+            .split('?')[0];
+          const listJsonPath = path.join(__dirname, '../../dist/webextension/chibi/', pathPart);
+          const listJsonContent = fs.readFileSync(listJsonPath, 'utf8');
+          return request.respond({
+            status: 200,
+            contentType: 'application/json',
+            body: listJsonContent,
+          });
+        }
+        if (request.headers()['x-malsync-test']) {
+          const requestMessage = JSON.parse(request.headers()['x-malsync-test']);
+          let requestName = getRequestName(requestMessage);
+          requestPath = path.join(pagePath, 'requests', requestName, 'data.json');
+          if (!fs.existsSync(requestPath)) {
+            return request.abort();
+          }
+          const content = fs.readFileSync(requestPath, 'utf8');
+          return request.respond({ status: 200, body: content });
+        } else if (request.url() === url || request.url() === url.replace(/#.*/, '')) {
+          const content = fs.readFileSync(filePath, 'utf8');
+          return request.respond({ status: 200, body: content, contentType: 'text/html' });
+        } else if (request.resourceType() === 'image') {
+          return request.respond({
+            status: 200,
+            body: fs.readFileSync(path.join(__dirname, '../../assets/icons/icon128.png')),
+            contentType: 'image/png'
+          });
+        } else {
+          return request.abort();
+        }
+      }
     });
+    try {
+      const [response] = await Promise.all([
+        page.goto(url, { timeout: 0 }),
+        page.waitForNavigation({ timeout: 30000 }),
+      ]);
+    } catch (e) {
+      await page.evaluate(() => window.stop());
+    }
+
+    return null;
+  } else {
+    await page.setBypassCSP(true);
+    await page.setRequestInterception(true);
+
+    const requestData = {};
+
+    page.on('request', (request) => {
+      if (!request.isInterceptResolutionHandled()) {
+        if (request.url().startsWith('https://chibi.malsync.moe/config/')) {
+          const pathPart = request
+            .url()
+            .replace('https://chibi.malsync.moe/config/', '')
+            .split('?')[0];
+          const listJsonPath = path.join(__dirname, '../../dist/webextension/chibi/', pathPart);
+          const listJsonContent = fs.readFileSync(listJsonPath, 'utf8');
+          const headers = request.headers();
+          delete headers['x-malsync-test'];
+          return request.respond({
+            headers,
+            status: 200,
+            contentType: 'application/json',
+            body: listJsonContent,
+          });
+        }
+      }
+    });
+
+    page.on('response', async (interceptedResponse) => {
+      if (interceptedResponse.request().headers()['x-malsync-test']) {
+        const requestMessage = JSON.parse(
+          interceptedResponse.request().headers()['x-malsync-test'],
+        );
+        const data = await interceptedResponse.text();
+        let requestName = getRequestName(requestMessage);
+
+        requestData[requestName] = data;
+
+        const requestFolder = path.join(pagePath, 'requests');
+        if (!fs.existsSync(requestFolder)) {
+          fs.mkdirSync(requestFolder);
+        }
+
+        const requestPath = path.join(pagePath, 'requests', requestName);
+        if (!fs.existsSync(requestPath)) {
+          fs.mkdirSync(requestPath);
+        }
+      }
+    });
+
+    try {
+      const [response] = await Promise.all([
+        page.goto(url, { timeout: 0 }),
+        page.waitForNavigation({ timeout: 30000 }),
+      ]);
+    } catch (e) {
+      log(block, 'Page loads too long', 2);
+      await page.evaluate(() => window.stop());
+    }
+
+    await new Promise((resolve, reject) => {
+      setTimeout(() => {
+        resolve();
+      }, 10000);
+    })
+
+    // Makes sure selected is set in dropdowns
+    await page.evaluate(() => {
+      const selects = document.querySelectorAll('select');
+      selects.forEach(select => {
+        const value = select.value;
+        select.querySelectorAll('option').forEach(option => {
+          if (option.value === value) {
+            option.setAttribute('selected', 'selected');
+          } else {
+            option.removeAttribute('selected');
+          }
+        });
+      });
+    });
+
+    let content = await page.content();
+
+    if (testPage.variables && testPage.variables.length) {
+      content += '<script>';
+
+      for (const variable of testPage.variables) {
+        varData = await page.evaluate((variable) => {
+          return JSON.stringify(window[variable]);
+        }, variable);
+        content += `window.${variable} = ${varData};`;
+      }
+
+      content += '</script>';
+    }
+
+    return async () => {
+      // Wait for requests to finish
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      fs.writeFileSync(filePath, content);
+      for (const key in requestData) {
+        fs.writeFileSync(path.join(pagePath, 'requests', key, 'data.json'), requestData[key]);
+      }
+    }
+  }
+}
+
+function checkIfFolderExists(block, name) {
+  const root = path.join(__dirname, '../dist/headless/');
+
+  if (!fs.existsSync(root)) {
+    fs.mkdirSync(root);
+  }
+
+  const clearPath = path.join(root, 'clear');
+  if (!fs.existsSync(clearPath)) {
+    fs.mkdirSync(clearPath);
+  }
+
+  const folderPath = path.join(clearPath, block);
+  if (!fs.existsSync(folderPath)) {
+    fs.mkdirSync(folderPath);
+  }
+
+  const filePath = path.join(folderPath, name);
+  if (!fs.existsSync(filePath)) {
+    fs.mkdirSync(filePath);
+  }
+}
+
+async function singleCase(block, test, page, testPage, retry = 0) {
+  const saveCallback = await PreparePage(block, page, test.url, testPage);
+  await injectTestEnvironment(page);
 
   const loadContent = await page.evaluate(() => document.body.innerHTML);
 
@@ -167,22 +366,37 @@ async function singleCase(block, test, page, retry = 0) {
     throw 'Blocked';
   }
 
+  await page.evaluate(() => console.log(`Adding script`));
   await page.addScriptTag({ content: script });
+
+  await page.evaluate(() => console.log(`Evaluating script`));
   const text = await page.evaluate(() => MalSyncTest());
+
+  if (OnlyPage) console.log(text);
 
   if (text.sync === 'cdn') {
     if (retry > 2) throw 'Max retries';
     log(block, `Retry ${text.type}`, 2);
     await cdn(page, text.type);
     retry++;
-    return singleCase(block, test, page, retry);
+    return singleCase(block, test, page, testPage, retry);
+  }
+
+  if (text === 'Page Not Found') {
+    throw 'Page Not Found';
   }
 
   expect(text.sync, 'Sync').to.equal(test.expected.sync);
   expect(text.title, 'Title').to.equal(test.expected.title);
   expect(text.identifier, 'Identifier').to.equal(test.expected.identifier);
+  expect(text.image, 'Image').to.equal(test.expected.image);
+  expect(text.season, 'Season').to.equal(test.expected.season);
+  expect(text.ruleSet, 'Rule set').to.equal(test.expected.ruleSet);
   if (text.sync) {
     expect(text.episode, 'Episode').to.equal(test.expected.episode);
+    if (test.expected.volume) {
+      expect(text.volume, 'Volume').to.equal(test.expected.volume);
+    }
     var textOverview =
       typeof text.overviewUrl !== 'undefined' ? text.overviewUrl.replace(/www[^.]*\./, '') : text.overviewUrl;
     var testOverview =
@@ -197,36 +411,38 @@ async function singleCase(block, test, page, retry = 0) {
   if (typeof text.uiSelector !== 'undefined') {
     expect(text.uiSelector === 'TEST-UI', 'UI').to.equal(test.expected.uiSelector);
   }
-  if (typeof text.epList !== 'undefined' && typeof test.expected.epList !== 'undefined') {
+  if (typeof test.expected.epList !== 'undefined') {
+    expect(text.epList, 'Episode List Empty').to.not.be.undefined;
+    expect(Object.keys(text.epList).length, 'Episode List Empty').to.not.equal(0);
     for (const key in test.expected.epList) {
+      if (!text.epList[key]) throw `Episode url ${key} is ${text.epList[key]}`;
       expect(test.expected.epList[key].replace(/www[^.]*\./, ''), `EP${key}`).to.equal(
         text.epList[key].replace(/www[^.]*\./, ''),
       );
     }
   }
+
+  if (saveCallback) await saveCallback();
 }
 
-async function testPageCase(block, testPage, page) {
+async function testPageCase(block, testPage, b) {
   log(block, '');
   log(block, testPage.title);
   if (testPage.unreliable) logC(block, 'Unreliable', 1, 'yellow');
   let passed = 1;
 
   if (typeof testPage.offline === 'undefined') testPage.offline = false;
-  if (testPage.offline) logC(block, 'Offline', 1, 'yellow');
-
-  try {
-    await onlineTest(testPage.url, page);
-    logC(block, 'Online', 1);
-  } catch (e) {
-    logC(block, 'Offline', 1);
-    log(block, e, 2);
+  if (testPage.offline) {
+    logC(block, 'Offline', 1, 'yellow');
+    return;
   }
+
   for (const testCase of testPage.testCases) {
+    const page = await openPage(b);
     try {
       logC(block, testCase.url, 1);
       await Promise.race([
-        singleCase(block, testCase, page),
+        singleCase(block, testCase, page, testPage),
         new Promise((_, reject) => setTimeout(() => reject('timeout'), 100 * 1000)),
       ]);
       logC(block, 'Passed', 2, 'green');
@@ -247,6 +463,7 @@ async function testPageCase(block, testPage, page) {
       }
       passed = 0;
     }
+    await page.close();
   }
 
   if (!mode.quiet || (mode.quiet && !passed)) printLogBlock(block);
@@ -258,14 +475,12 @@ async function testPageCase(block, testPage, page) {
 }
 
 async function loopEl(testPage, headless = true) {
-  // if(testPage.title !== 'Kissmanga') return;
+  if (OnlyPage && testPage.title !== OnlyPage) return;
   if (!testPage.enabled && typeof testPage.enabled !== 'undefined') return;
   const b = await getBrowser(headless);
-  const page = await b.newPage();
-  await page.setViewport({ width: 1920, height: 1080 });
 
   try {
-    await testPageCase(testPage.title, testPage, page);
+    await testPageCase(testPage.title, testPage, b);
   } catch (e) {
     if (e === 'Captcha') {
       if (!process.env.CI && headless === true) {
@@ -279,12 +494,10 @@ async function loopEl(testPage, headless = true) {
       console.error(e);
     }
   }
-
-  await page.close();
 }
 
 async function initTestsArray() {
-  new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     dir.readFiles(
       `${__dirname}/../../src/`,
       {
@@ -299,7 +512,14 @@ async function initTestsArray() {
               const cleanChanged = changed.replace(/[^\/]+\.(less|ts|json)$/, '');
               const cleanFile = file.replace('tests.json', '').replace(/\\/g, '/')
 
-              return changed && cleanChanged !== 'src/pages/' && cleanFile.includes(cleanChanged);
+              return (
+                changed &&
+                cleanChanged &&
+                cleanChanged !== 'src/' &&
+                cleanChanged !== 'src/pages/' &&
+                cleanChanged !== 'src/pages-chibi/' &&
+                cleanFile.includes(cleanChanged)
+              );
             }
 
           );
@@ -347,6 +567,15 @@ async function main() {
   const awaitArray = [];
   let running = 0;
   await initTestsArray();
+
+  if (process.env.LIST_PAGES) {
+    const pages = testsArray
+      .filter(t => (t.enabled || typeof t.enabled === 'undefined') && !t.offline)
+      .map(t => t.title);
+    console.log(JSON.stringify(pages));
+    process.exit();
+  }
+
   if (mode.parallel) {
     await getBrowser();
     for (const testPage of testsArray) {

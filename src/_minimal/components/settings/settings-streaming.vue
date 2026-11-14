@@ -1,0 +1,374 @@
+<template>
+  <div class="quicklinkedit">
+    <Section :spacer="short ? 'none' : 'half'">
+      <Card>
+        <Section class="ui-row">
+          <FormButton color="secondary" padding="slim" @click="orderMode = !orderMode">
+            <span class="material-icons">{{ orderMode ? 'edit_attributes' : 'low_priority' }}</span>
+          </FormButton>
+          <FormButton
+            v-visible="!orderMode"
+            title="Anime"
+            :color="animeFilter ? 'secondary' : 'default'"
+            padding="pill"
+            @click="animeFilter = !animeFilter"
+          />
+          <FormButton
+            v-visible="!orderMode"
+            title="Manga"
+            :color="mangaFilter ? 'secondary' : 'default'"
+            padding="pill"
+            @click="mangaFilter = !mangaFilter"
+          />
+          <FormText
+            v-model="search"
+            v-visible="!orderMode"
+            icon="search"
+            :clear-icon="true"
+            class="search-field"
+          />
+        </Section>
+        <div v-if="!orderMode" class="grid">
+          <div
+            v-for="link in linksWithState"
+            :key="link.name"
+            class="quicklink"
+            :class="{
+              active: link.active,
+            }"
+            @click="toggleLink(link)"
+          >
+            <FormButton :animation="false" :icon="groupIcon(link)" class="btn">
+              <TextIcon :src="favicon(link.domain)">{{ link.name }}</TextIcon>
+            </FormButton>
+          </div>
+        </div>
+        <div v-else>
+          <div
+            ref="sortList"
+            class="forSorting"
+            @pointerdown="dragStart"
+            @pointermove="dragMove"
+            @pointerup="dragEnd"
+            @pointercancel="dragEnd"
+            @dragstart.prevent
+          >
+            <FormButton
+              v-for="(element, index) in sortedLinks"
+              :key="optionToCombined(element).name"
+              :animation="false"
+              class="grab"
+              :class="{ dragging: index === dragIndex }"
+            >
+              <TextIcon icon="drag_handle">
+                <TextIcon :src="favicon(optionToCombined(element).domain)">
+                  {{ optionToCombined(element).name }}
+                </TextIcon>
+              </TextIcon>
+            </FormButton>
+          </div>
+        </div>
+      </Card>
+    </Section>
+    <Card v-if="!short">
+      <Header :spacer="true">{{ lang('settings_StreamingSite_custom') }}</Header>
+      <Section>
+        <table>
+          <tbody>
+            <tr class="row">
+              <td><CodeBlock>{searchterm}</CodeBlock></td>
+              <td>=> <CodeBlock>no%20game%20no%20life</CodeBlock></td>
+            </tr>
+            <tr class="row">
+              <td><CodeBlock>{searchtermPlus}</CodeBlock></td>
+              <td>=> <CodeBlock>no+game+no+life</CodeBlock></td>
+            </tr>
+            <tr class="row">
+              <td><CodeBlock>{searchtermMinus}</CodeBlock></td>
+              <td>=> <CodeBlock>no-game-no-life</CodeBlock></td>
+            </tr>
+            <tr class="row">
+              <td><CodeBlock>{searchtermUnderscore}</CodeBlock></td>
+              <td>=> <CodeBlock>no_game_no_life</CodeBlock></td>
+            </tr>
+            <tr>
+              <td><CodeBlock>{searchtermRaw}</CodeBlock></td>
+              <td>=> <CodeBlock>no game no life</CodeBlock></td>
+            </tr>
+          </tbody>
+        </table>
+      </Section>
+
+      <HR />
+
+      <Section spacer="half">
+        <FormText
+          v-model="customName"
+          :placeholder="lang('settings_StreamingSite_custom_url_name')"
+          class="custom-field"
+        />
+      </Section>
+      <Section spacer="half">
+        <FormText
+          v-model="customAnime"
+          :placeholder="lang('settings_StreamingSite_custom_url_anime')"
+          class="custom-field"
+        />
+      </Section>
+      <Section spacer="half">
+        <FormText
+          v-model="customManga"
+          :placeholder="lang('settings_StreamingSite_custom_url_manga')"
+          class="custom-field"
+        />
+      </Section>
+
+      <FormButton
+        color="secondary"
+        :disabled="!customName || (!customAnime && !customManga)"
+        @click="!customName || (!customAnime && !customManga) ? '' : addCustom()"
+      >
+        {{ lang('Add') }}
+      </FormButton>
+    </Card>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { computed, ref, shallowRef, toRaw } from 'vue';
+import { optionToCombined, getQuicklinks, removeOptionKey } from '../../../utils/quicklinksBuilder';
+import FormButton from '../form/form-button.vue';
+import TextIcon from '../text-icon.vue';
+import Card from '../card.vue';
+import FormText from '../form/form-text.vue';
+import Section from '../section.vue';
+import Header from '../header.vue';
+import CodeBlock from '../code-block.vue';
+import HR from '../hr.vue';
+import { localStore } from '../../../utils/localStore';
+
+defineProps({
+  title: {
+    type: String,
+    default: '',
+  },
+  short: {
+    type: Boolean,
+    default: false,
+  },
+});
+
+function stateNumber(link) {
+  if (link.custom) return 0;
+  if (link.database) return 1;
+  if (link.search && !(link.search.anime === 'home' || link.search.manga === 'home')) return 2;
+  return 10;
+}
+
+const model = computed({
+  get() {
+    return api.settings.get('quicklinks').filter(el => optionToCombined(el));
+  },
+  set(value) {
+    api.settings.set('quicklinks', value);
+    if (api.type === 'webextension') localStore.clear();
+  },
+});
+
+const search = ref('');
+const customName = ref('');
+const customAnime = ref('');
+const customManga = ref('');
+const animeFilter = ref(true);
+const mangaFilter = ref(true);
+
+const linksWithState = computed(() => {
+  return [...getQuicklinks(), ...model.value.filter(el => typeof el === 'object' && el)]
+    .filter(el => {
+      if (!search.value) return true;
+      return el.name.toLowerCase().includes(search.value.toLowerCase());
+    })
+    .filter(el => {
+      if (animeFilter.value && mangaFilter.value) return true;
+      if (animeFilter.value) return el.search.anime;
+      if (mangaFilter.value) return el.search.manga;
+      return false;
+    })
+    .map(el => {
+      el.active = model.value.includes(el.name) || el.custom;
+      return el;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => {
+      return stateNumber(a) - stateNumber(b);
+    });
+});
+
+const favicon = (url: string) => {
+  return utils.favicon(url.split('/')[2]);
+};
+
+const groupIcon = el => {
+  if (el.custom) return 'tune';
+  if (el.database) return 'link';
+  if (el.search && !(el.search.anime === 'home' || el.search.manga === 'home')) return 'search';
+  return 'home';
+};
+
+const toggleLink = link => {
+  if (link.active) {
+    if (link.custom) {
+      customName.value = link.name;
+      customAnime.value = link.search.anime;
+      customManga.value = link.search.manga;
+    }
+    model.value = removeOptionKey(model.value, link.name);
+  } else {
+    model.value.push(link.name);
+  }
+  model.value = [...model.value];
+};
+
+const addCustom = () => {
+  let domain = '';
+  if (customAnime.value || customManga.value) {
+    let domainParts;
+    if (customAnime.value) {
+      domainParts = customAnime.value.split('?')[0].split('#')[0].split('/');
+    } else {
+      domainParts = customManga.value.split('?')[0].split('#')[0].split('/');
+    }
+    if (domainParts.length > 2) {
+      domain = `${domainParts[0]}//${domainParts[2]}/`;
+    }
+  }
+
+  if (!domain) {
+    utils.flashm('Something is wrong', { error: true });
+    return;
+  }
+
+  const res = {
+    name: customName.value,
+    custom: true,
+    domain,
+    search: {
+      anime: customAnime.value ? customAnime.value : null,
+      manga: customManga.value ? customManga.value : null,
+    },
+  };
+
+  model.value = [...model.value, res];
+  customName.value = '';
+  customAnime.value = '';
+  customManga.value = '';
+};
+
+// Order
+
+const orderMode = ref(false);
+const sortList = ref<HTMLElement | null>(null);
+const dragIndex = ref<number | null>(null);
+// Plain (non-reactive) array: a Vue proxy would not be stored as an array in chrome.storage
+const dragLinks = shallowRef<typeof model.value>([]);
+
+// While dragging, a local copy is reordered; settings are only written on release
+const sortedLinks = computed(() => (dragIndex.value === null ? model.value : dragLinks.value));
+
+const indexAtPointer = (e: PointerEvent) => {
+  if (!sortList.value) return -1;
+  return Array.from(sortList.value.children).findIndex(child => {
+    const rect = child.getBoundingClientRect();
+    return e.clientY >= rect.top && e.clientY <= rect.bottom;
+  });
+};
+
+const dragStart = (e: PointerEvent) => {
+  if (e.button !== 0 || !sortList.value) return;
+  const index = indexAtPointer(e);
+  if (index === -1) return;
+  dragLinks.value = [...toRaw(model.value)];
+  dragIndex.value = index;
+  sortList.value.setPointerCapture(e.pointerId);
+};
+
+const dragMove = (e: PointerEvent) => {
+  if (dragIndex.value === null) return;
+  const target = indexAtPointer(e);
+  if (target === -1 || target === dragIndex.value) return;
+  const list = [...dragLinks.value];
+  const [moved] = list.splice(dragIndex.value, 1);
+  list.splice(target, 0, moved);
+  dragLinks.value = list;
+  dragIndex.value = target;
+};
+
+const dragEnd = () => {
+  if (dragIndex.value === null) return;
+  const original = toRaw(model.value);
+  const changed = dragLinks.value.some((el, i) => el !== original[i]);
+  dragIndex.value = null;
+  if (changed) model.value = dragLinks.value;
+};
+</script>
+
+<style lang="less" scoped>
+@import '../../less/_globals.less';
+.quicklinkedit {
+  padding: @spacer-half 0;
+}
+
+.grid {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: @spacer-half;
+
+  .__breakpoint-popup__({
+    justify-content: flex-start;
+  });
+}
+
+.row > td {
+  padding-bottom: 15px;
+}
+
+.quicklink {
+  opacity: 0.5;
+  filter: grayscale(1);
+  &.active {
+    opacity: 1;
+    filter: none;
+  }
+}
+
+.search-field {
+  width: 100%;
+}
+
+.custom-field {
+  min-width: 250px;
+}
+
+.ui-row {
+  display: flex;
+  gap: @spacer-half;
+  align-items: stretch;
+}
+
+.forSorting {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  touch-action: none;
+  user-select: none;
+}
+
+.grab {
+  cursor: row-resize;
+}
+
+.dragging {
+  opacity: 0.5;
+}
+</style>

@@ -6,10 +6,23 @@ import { compareTwoStrings } from 'string-similarity';
 
 import { search as pageSearch } from '../searchFactory';
 import { Single as LocalSingle } from '../Local/single';
-import { getCacheKey } from '../singleFactory';
-import { RulesClass } from './rulesClass';
-
+import { getRulesCacheKey } from '../singleFactory';
+import {
+  DEFAULT_RULE_SET,
+  RULE_SET_SELECTIONS,
+  RuleSetSelection,
+  RuleSetType,
+  RulesClass,
+  resolveRuleSet,
+} from './rulesClass';
+import { RuleConflict, RuleConflictClass } from './ruleConflictClass';
+import { NotAutenticatedError } from '../Errors';
 import { getSyncMode } from '../helper';
+import { buildProviderUrl } from '../../utils/slugs';
+import type { pageState } from '../../pages/pageInterface';
+
+// default: opened by the user, sync: opened automatically to correct the entry, conflict: only asks to resolve a rule conflict
+export type CorrectionMode = 'default' | 'sync' | 'conflict';
 
 interface SearchResult {
   id?: number;
@@ -24,7 +37,7 @@ interface SearchResult {
 }
 
 export class SearchClass {
-  private sanitizedTitel;
+  private sanitizedTitle;
 
   private page;
 
@@ -38,9 +51,13 @@ export class SearchClass {
 
   changed = false;
 
-  constructor(protected title: string, protected type: 'anime' | 'manga' | 'novel', protected identifier: string) {
+  constructor(
+    protected title: string,
+    protected type: 'anime' | 'manga' | 'novel',
+    protected identifier: string,
+  ) {
     this.identifier += '';
-    this.sanitizedTitel = this.sanitizeTitel(this.title);
+    this.sanitizedTitle = this.sanitizeTitle(this.title);
     this.logger = con.m('search', 'red');
   }
 
@@ -96,7 +113,7 @@ export class SearchClass {
   }
 
   getOffset(): number {
-    if (this.state) {
+    if (this.state && this.state.offset) {
       return this.state.offset;
     }
     return 0;
@@ -123,8 +140,8 @@ export class SearchClass {
     return 0;
   }
 
-  getSanitizedTitel() {
-    return this.sanitizedTitel;
+  getSanitizedTitle() {
+    return this.sanitizedTitle;
   }
 
   getNormalizedType() {
@@ -132,8 +149,11 @@ export class SearchClass {
     return 'manga';
   }
 
-  public sanitizeTitel(title) {
-    let resTitle = title.replace(/ *(\(dub\)|\(sub\)|\(uncensored\)|\(uncut\)|\(subbed\)|\(dubbed\))/i, '');
+  public sanitizeTitle(title) {
+    let resTitle = title.replace(
+      / *(\(dub\)|\(sub\)|\(uncensored\)|\(uncut\)|\(subbed\)|\(dubbed\)|\(novel\)|\(wn\)|\(ln\))/i,
+      '',
+    );
     resTitle = resTitle.replace(/ *\([^)]+audio\)/i, '');
     resTitle = resTitle.replace(/ BD( |$)/i, '');
     resTitle = resTitle.trim();
@@ -152,7 +172,10 @@ export class SearchClass {
       this.state = await this.searchForIt();
     }
 
-    if (!this.state || (this.state && !['user', 'firebase', 'sync', 'local'].includes(this.state.provider))) {
+    if (
+      !this.state ||
+      (this.state && !['user', 'firebase', 'sync', 'local'].includes(this.state.provider))
+    ) {
       const tempRes = await this.onsiteSearch();
       if (tempRes) this.state = tempRes;
     }
@@ -223,7 +246,8 @@ export class SearchClass {
     try {
       result = searchCompare(result, await this.malSync());
     } catch (e) {
-      if (this.page && this.page.database) this.logger.error('MALSync api error or not supported', e);
+      if (this.page && this.page.database)
+        this.logger.error('MALSync api error or not supported', e);
     }
 
     if ((result && result.provider !== 'firebase') || !result) {
@@ -242,10 +266,15 @@ export class SearchClass {
       }
     }
 
-    if (result && result.provider === 'firebase' && api.settings.get('syncMode') !== 'MAL' && !result.url) {
+    if (
+      result &&
+      result.provider === 'firebase' &&
+      api.settings.get('syncMode') !== 'MAL' &&
+      !result.url
+    ) {
       try {
         const temp = await this.pageSearch();
-        if (temp && !(temp.url.indexOf('myanimelist.net') !== -1) && temp.similarity.same) {
+        if (temp && !utils.isDomainMatching(temp.url, 'myanimelist.net') && temp.similarity.same) {
           this.logger.log('Ignore Firebase', result);
           result = temp;
         }
@@ -271,14 +300,18 @@ export class SearchClass {
 
     const logger = this.logger.m('Firebase');
 
-    const url = `https://kissanimelist.firebaseio.com/Data2/${this.page.database}/${encodeURIComponent(
-      this.identifierToDbKey(this.identifier),
-    ).toLowerCase()}/Mal.json`;
+    const url = `https://kissanimelist.firebaseio.com/Data2/${
+      this.page.database
+    }/${encodeURIComponent(this.identifierToDbKey(this.identifier)).toLowerCase()}/Mal.json`;
     logger.log(url);
     const response = await api.request.xhr('GET', url);
 
     logger.log('response', response.responseText);
-    if (!response.responseText || response.responseText === 'null' || response.responseText.includes('error'))
+    if (
+      !response.responseText ||
+      response.responseText === 'null' ||
+      response.responseText.includes('error')
+    )
       return false;
     let matches;
     try {
@@ -291,11 +324,10 @@ export class SearchClass {
     if (!matches || Object.keys(matches).length === 0) return false;
 
     const id = Object.keys(matches)[0];
-    const name = matches[id];
 
     let returnUrl = '';
 
-    if (id !== 'Not-Found') returnUrl = `https://myanimelist.net/${this.page.type}/${id}/${name}`;
+    if (id !== 'Not-Found') returnUrl = buildProviderUrl('MAL', this.page.type, id);
 
     return {
       url: returnUrl,
@@ -312,7 +344,7 @@ export class SearchClass {
     const logger = this.logger.m('API');
 
     if (!this.page) return false;
-    const dbPl = this.page.database ? this.page.database : this.page.name;
+    const dbPl = this.page.database;
     if (!dbPl) return false;
     const url = `https://api.malsync.moe/page/${dbPl}/${encodeURIComponent(
       this.identifierToDbKey(this.identifier),
@@ -330,7 +362,11 @@ export class SearchClass {
 
     let pageUrl = res.malUrl;
 
-    if (!pageUrl && res.aniUrl && getSyncMode(this.getNormalizedType()) === 'ANILIST') {
+    if (
+      !pageUrl &&
+      res.aniUrl &&
+      ['ANILIST', 'MANGABAKA'].includes(getSyncMode(this.getNormalizedType()))
+    ) {
       pageUrl = res.aniUrl;
     }
 
@@ -348,28 +384,32 @@ export class SearchClass {
   public async malSearch(): Promise<SearchResult | false> {
     const logger = this.logger.m('MAL');
 
-    let url = `https://myanimelist.net/${this.getNormalizedType()}.php?q=${encodeURI(this.sanitizedTitel)}`;
-    if (this.type === 'novel') {
-      url = `https://myanimelist.net/${this.getNormalizedType()}.php?type=2&q=${encodeURI(this.sanitizedTitel)}`;
-    }
+    const url = `https://myanimelist.net/${this.getNormalizedType()}.php?q=${encodeURI(
+      this.sanitizedTitle,
+    )}`;
+
     logger.log(url);
 
-    function handleResult(response, i, This) {
+    function handleResult(response, i, This: SearchClass): SearchResult {
       const link = getLink(response, i);
       let id = 0;
       let sim = { same: false, value: 0 };
       if (link !== false) {
         try {
-          if (This.type === 'manga') {
-            const typeCheck = response.responseText.split(`href="${link}" id="si`)[1].split('</tr>')[0];
-            if (typeCheck.indexOf('Novel') !== -1) {
-              logger.log('Novel Found check next entry');
+          if (This.type === 'manga' || This.type === 'novel') {
+            const typeCheck = response.responseText
+              .split(`href="${link}" id="si`)[1]
+              .split('</tr>')[0];
+            const linkIsNovel = typeCheck.indexOf('Novel') !== -1;
+
+            if ((This.type === 'manga' && linkIsNovel) || (This.type === 'novel' && !linkIsNovel)) {
+              logger.log(`${linkIsNovel ? 'Novel Found' : 'Novel Not found'} check next entry`);
               return handleResult(response, i + 1, This);
             }
           }
 
-          const malTitel = getTitle(response, link);
-          sim = SearchClass.similarity(malTitel, This.sanitizedTitel);
+          const malTitle = getTitle(response, link);
+          sim = SearchClass.similarity(malTitle, This.sanitizedTitle);
           id = parseInt(link.split('/')[4]);
         } catch (e) {
           logger.error(e);
@@ -422,16 +462,20 @@ export class SearchClass {
   }
 
   public async pageSearch(): Promise<SearchResult | false> {
-    const searchResult = await pageSearch(this.sanitizedTitel, this.getNormalizedType());
+    const searchResult = await pageSearch(this.sanitizedTitle, this.getNormalizedType());
     let best: any = null;
     for (let i = 0; i < searchResult.length && i < 5; i++) {
       const el = searchResult[i];
-      const sim = SearchClass.similarity(el.name, this.sanitizedTitel, el.altNames);
+      const sim = SearchClass.similarity(el.name, this.sanitizedTitle, el.altNames);
       const tempBest = {
         index: i,
         similarity: sim,
       };
-      if ((this.type === 'manga' && !el.isNovel) || (this.type === 'novel' && el.isNovel) || this.type === 'anime') {
+      if (
+        (this.type === 'manga' && !el.isNovel) ||
+        (this.type === 'novel' && el.isNovel) ||
+        this.type === 'anime'
+      ) {
         if (!best || sim.value > best.similarity.value) {
           best = tempBest;
         }
@@ -554,45 +598,129 @@ export class SearchClass {
     if (this.page.database === 'Crunchyroll') {
       return encodeURIComponent(title.toLowerCase().split('#')[0]).replace(/\./g, '%2E');
     }
-    return title
-      .toLowerCase()
-      .split('#')[0]
-      .replace(/\./g, '%2E');
+    if (this.page.database === 'MangaFire') {
+      return encodeURIComponent(title.toLowerCase().split('#')[0]);
+    }
+    return title.toLowerCase().split('#')[0].replace(/\./g, '%2E');
   }
 
   // Rules
   rules: RulesClass | undefined;
 
+  protected ruleSetSelection: RuleSetSelection = 'auto';
+
+  // Rule set the page uses, replaces the default for auto
+  protected pageRuleSet: RuleSetType | undefined;
+
+  setPageRuleSet(ruleSet?: RuleSetType) {
+    this.pageRuleSet = ruleSet;
+  }
+
   async initRules() {
     const logger = con.m('Rules');
     const url = this.getUrl();
     logger.log('Url', url);
-    if (url) {
-      const cacheKeyObj = await getCacheKey(url);
-      logger.log('Cachekey', cacheKeyObj);
-      this.rules = await new RulesClass(cacheKeyObj.cacheKey, this.getNormalizedType()).init();
-      return cacheKeyObj.singleObj;
+    if (!url) return undefined;
+
+    let cacheKeyObj;
+    try {
+      cacheKeyObj = await getRulesCacheKey(url);
+    } catch (e) {
+      if (!(e instanceof NotAutenticatedError)) throw e;
+      logger.info('Not authenticated');
+      return undefined;
     }
+    logger.log('Cachekey', cacheKeyObj);
+    this.rules = await new RulesClass(cacheKeyObj.rulesCacheKey, this.getNormalizedType()).init();
+    await this.loadRuleSet();
+
+    return cacheKeyObj.singleObj;
+  }
+
+  protected getRuleSetKey(): string | undefined {
+    const tvdbId = this.rules ? this.rules.getTvdbId() : undefined;
+    if (!tvdbId) return undefined;
+    return `${this.page.name}/tvdb/${tvdbId}/RuleSet`;
+  }
+
+  async loadRuleSet() {
+    const key = this.getRuleSetKey();
+    if (!key) return;
+    const selection = await api.storage.get(key);
+    if (RULE_SET_SELECTIONS.includes(selection)) this.ruleSetSelection = selection;
+  }
+
+  getRuleSetSelection(): RuleSetSelection {
+    return this.ruleSetSelection;
+  }
+
+  // Rule set of auto, the one of the page or the default
+  getAutoRuleSet(): RuleSetType {
+    return this.pageRuleSet || DEFAULT_RULE_SET;
+  }
+
+  getRuleSet(): RuleSetType {
+    return resolveRuleSet(this.ruleSetSelection, this.getAutoRuleSet());
+  }
+
+  async setRuleSet(selection: RuleSetSelection) {
+    // Also rerun when switching to auto, it can ask for conflicts again
+    if (this.ruleSetSelection !== selection) this.changed = true;
+    this.ruleSetSelection = selection;
+    const key = this.getRuleSetKey();
+    if (key) await api.storage.set(key, selection);
+  }
+
+  isSimilar(): boolean {
+    return Boolean(this.state && this.state.similarity && this.state.similarity.same);
+  }
+
+  // Episode the rules apply to: the episode on sync pages, episode 1 of the season on overview pages
+  getRuleEpisode(state?: pageState | null): number | undefined {
+    if (!state) return undefined;
+    if (state.on === 'SYNC' && typeof state.detectedEpisode === 'number') {
+      return Number.isNaN(state.detectedEpisode) ? undefined : state.detectedEpisode;
+    }
+    if (state.on === 'OVERVIEW' && typeof state.season === 'number') return 1;
     return undefined;
   }
 
-  applyRules(episode: number) {
-    if (this.rules) {
-      const userOffset = this.getOffset() || 0;
-      const res = this.rules.applyRules(Number(episode) + Number(userOffset));
-      if (res) res.offset = Number(res.offset) + Number(userOffset);
-      return res;
-    }
-    return undefined;
+  // Episode in the numbering of the rules, includes the user offset
+  withUserOffset(episode?: number): number | undefined {
+    if (typeof episode !== 'number' || Number.isNaN(episode)) return undefined;
+    return Number(episode) + Number(this.getOffset() || 0);
   }
 
-  getRuledOffset(episode: number): number {
-    const res = this.applyRules(episode);
+  getRuleConflict(episode?: number, season?: number): RuleConflict | undefined {
+    const ruleEpisode = this.withUserOffset(episode);
+    if (!this.rules || ruleEpisode === undefined) return undefined;
+
+    if (this.ruleSetSelection !== 'auto') return undefined;
+
+    return new RuleConflictClass(
+      this.rules,
+      this.getRuleSet(),
+      this.getUrl(),
+      this.pageRuleSet,
+    ).getConflict(ruleEpisode, season);
+  }
+
+  applyRules(episode?: number, season?: number) {
+    const ruleEpisode = this.withUserOffset(episode);
+    if (!this.rules || ruleEpisode === undefined) return undefined;
+
+    const res = this.rules.applyRules(ruleEpisode, season, this.getRuleSet());
+    if (res) res.offset = Number(res.offset) + Number(this.getOffset() || 0);
+    return res;
+  }
+
+  getRuledOffset(episode?: number, season?: number): number {
+    const res = this.applyRules(episode, season);
     return res ? res.offset : this.getOffset();
   }
 
-  getRuledUrl(episode: number): string | null {
-    const res = this.applyRules(episode);
+  getRuledUrl(episode?: number, season?: number): string | null {
+    const res = this.applyRules(episode, season);
     return res ? res.url : this.getUrl();
   }
 }

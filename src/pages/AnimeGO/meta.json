@@ -1,0 +1,6 @@
+{
+    "search": "https://animego.me/search/all?q={searchterm}",
+    "urls": {
+        "match": ["*://animego.me/anime/*", "*://animego.me/anime/*"]
+    }
+}

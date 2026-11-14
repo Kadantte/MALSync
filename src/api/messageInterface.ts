@@ -1,6 +1,6 @@
 export interface xhrI {
   name: 'xhr';
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   url: string | { url: string; data?: any; headers?: any };
 }
 export interface xhrResponseI {
@@ -41,11 +41,6 @@ export interface minimalWindow {
   left: number;
 }
 
-export interface emitter {
-  name: 'emitter';
-  item: any;
-}
-
 export interface notification {
   url: string;
   title: string;
@@ -74,7 +69,6 @@ export type sendMessageI =
   | videoTimeSet
   | minimalWindow
   | content
-  | emitter
   | notificationMessage
   | databaseMessage;
 

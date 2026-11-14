@@ -1,0 +1,17 @@
+{
+  "title": "YummyAni",
+  "url": "https://old.yummyani.me",
+  "testCases": [
+    {
+      "url": "https://old.yummyani.me/catalog/item/shpionskiy-klass",
+      "expected": {
+        "sync": true,
+        "title": "Spy Classroom",
+        "identifier": "shpionskiy-klass",
+        "episode": 1,
+        "overviewUrl": "https://old.yummyani.me/catalog/item/shpionskiy-klass",
+        "image": "https://static.yani.tv/posters/huge/1636666215.avif"
+      }
+    }
+  ]
+}

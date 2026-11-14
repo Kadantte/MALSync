@@ -1,12 +1,12 @@
 {
-  "search": "https://www2.kickassanime.ro/search?q={searchterm}",
+  "search": "https://kaa.lt/search?q={searchterm}",
   "urls": {
     "match": [
-      "*://*.kickassanime.io/anime/*",
-      "*://*.kickassanime.ru/anime/*",
-      "*://*.kickassanime.rs/anime/*",
-      "*://*.kickassanime.lol/anime/*",
-      "*://*.kickassanime.ro/anime/*"
+      "*://*.kaa.lt/*",
+      "*://*.kaa.si/*",
+      "*://*.kaa.to/*",
+      "*://*.kaa.rs/*",
+      "*://*.kickassanime.cx/*"
     ]
   }
 }

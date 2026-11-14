@@ -1,0 +1,66 @@
+{
+  "title": "ComicDays",
+  "url": "https://comic-days.com/",
+  "testCases": [
+    {
+      "url": "https://comic-days.com/episode/2551460909687428157",
+      "expected": {
+        "sync": true,
+        "title": "死んだ木村を上演",
+        "identifier": "2551460909660834592",
+        "overviewUrl": "https://comic-days.com/episode/2551460909687428157",
+        "episode": 1,
+        "nextEpUrl": "https://comic-days.com/episode/2551460909687428165",
+        "image": "https://cdn-img.comic-days.com/public/series-thumbnail/2551460909660834592-cf01c09fd150105159d66731ce757295?1760493525",
+        "uiSelector": true
+      }
+    },
+    {
+      "url": "https://comic-days.com/episode/13933686331610290511",
+      "expected": {
+        "sync": true,
+        "title": "修羅の門",
+        "identifier": "13933686331610217963",
+        "overviewUrl": "https://comic-days.com/episode/13933686331610290511",
+        "episode": 7,
+        "nextEpUrl": "https://comic-days.com/episode/13933686331610291520",
+        "image": "https://cdn-img.comic-days.com/public/series-thumbnail/13933686331610217963-8f6101897fce822b40d535c0b15a9af0?1641808591",
+        "uiSelector": true
+      }
+    },
+    {
+      "url": "https://comic-days.com/episode/2550912965401934234",
+      "expected": {
+        "sync": true,
+        "title": "あくまでクジャクの話です。",
+        "identifier": "14079602755433297556",
+        "overviewUrl": "https://comic-days.com/episode/2550912965401934234",
+        "episode": 42,
+        "nextEpUrl": "https://comic-days.com/episode/12207421983379583732",
+        "image": "https://cdn-img.comic-days.com/public/series-thumbnail/14079602755433297556-3cc6cd943f661cac2694cc7639fb0775?1701220844",
+        "uiSelector": true,
+        "epList": {
+          "57": "https://comic-days.com/episode/12207421983379583732",
+          "58": "https://comic-days.com/episode/12207421983379583741"
+        }
+      }
+    },
+    {
+      "url": "https://comic-days.com/episode/2550912966060237893",
+      "expected": {
+        "sync": true,
+        "title": "THE BAND",
+        "identifier": "2550912964861922017",
+        "overviewUrl": "https://comic-days.com/episode/2550912966060237893",
+        "episode": 9,
+        "nextEpUrl": "https://comic-days.com/episode/12207421983917775448",
+        "image": "https://cdn-img.comic-days.com/public/series-thumbnail/2550912964861922017-e5cf341fde48f3832b6608943f34cbf2?1731388779",
+        "uiSelector": true,
+        "epList": {
+          "19": "https://comic-days.com/episode/12207421983800314909",
+          "20": "https://comic-days.com/episode/12207421983917775448"
+        }
+      }
+    }
+  ]
+}

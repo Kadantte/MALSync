@@ -6,9 +6,7 @@ export const MangaHub: pageInterface = {
   languages: ['English'],
   type: 'manga',
   getImage() {
-    return $('#mangadetail img.manga-thumb')
-      .first()
-      .attr('src');
+    return $('#mangadetail img.manga-thumb').first().attr('src');
   },
   isSyncPage(url) {
     if (j.$('#mangareader').length) {
@@ -24,10 +22,7 @@ export const MangaHub: pageInterface = {
   },
   sync: {
     getTitle(url) {
-      return j
-        .$('#mangareader .container-fluid h3 a')
-        .text()
-        .trim();
+      return j.$('#mangareader .container-fluid h3 a').text().trim();
     },
     getIdentifier(url) {
       return utils.urlPart(url, 4);
@@ -45,22 +40,24 @@ export const MangaHub: pageInterface = {
       return Number(temp[0].replace(/\D+/g, ''));
     },
     nextEpUrl(url) {
-      return j
-        .$('#mangareader ul.dropdown-menu li.active')
-        .next()
-        .find('a')
-        .attr('href');
+      return j.$('#mangareader ul.dropdown-menu li.active').next().find('a').attr('href');
     },
+    readerConfig: [
+      {
+        current: {
+          selector: '#mangareader [src^="https://img.mghubcdn.com"]',
+          mode: 'countAbove',
+        },
+        total: {
+          selector: '#mangareader [src^="https://img.mghubcdn.com"]',
+          mode: 'count',
+        },
+      },
+    ],
   },
   overview: {
     getTitle(url) {
-      return j
-        .$('#mangadetail h1')
-        .clone()
-        .children()
-        .remove()
-        .end()
-        .text();
+      return j.$('#mangadetail h1').clone().children().remove().end().text();
     },
     getIdentifier(url) {
       return utils.urlPart(url, 4);
@@ -75,15 +72,10 @@ export const MangaHub: pageInterface = {
     list: {
       offsetHandler: false,
       elementsSelector() {
-        return j.$('#noanim-content-tab div li');
+        return j.$('#chapters-tab .list-group-item');
       },
       elementUrl(selector) {
-        return (
-          selector
-            .find('a')
-            .first()
-            .attr('href') || ''
-        );
+        return selector.find('a').first().attr('href') || '';
       },
       elementEp(selector) {
         return MangaHub.sync.getEpisode(MangaHub.overview!.list!.elementUrl!(selector));
@@ -91,11 +83,13 @@ export const MangaHub: pageInterface = {
     },
   },
   init(page) {
-    api.storage.addStyle(require('!to-string-loader!css-loader!less-loader!./style.less').toString());
+    api.storage.addStyle(
+      require('!to-string-loader!css-loader!less-loader!./style.less').toString(),
+    );
 
     let Interval;
 
-    j.$(document).ready(function() {
+    j.$(document).ready(function () {
       start();
 
       utils.changeDetect(
@@ -113,10 +107,10 @@ export const MangaHub: pageInterface = {
       if (j.$('#mangareader').length) {
         clearInterval(Interval);
         Interval = utils.waitUntilTrue(
-          function() {
+          function () {
             return j.$('#mangareader ul.dropdown-menu li.active').length;
           },
-          function() {
+          function () {
             page.handlePage();
           },
         );
@@ -127,13 +121,13 @@ export const MangaHub: pageInterface = {
         }
         clearInterval(Interval);
         Interval = utils.waitUntilTrue(
-          function() {
+          function () {
             if (j.$('#mangadetail div.ads-container').length > 0) {
               return true;
             }
             return false;
           },
-          function() {
+          function () {
             page.handlePage();
           },
         );

@@ -1,10 +1,10 @@
-import Vue from 'vue';
+import { createApp } from '../utils/Vue';
 import { Single as SimklSingle } from '../_provider/Simkl/single';
-import { UserList } from '../_provider/Simkl/list';
-import * as helper from '../provider/Simkl/helper';
+import * as helper from '../_provider/Simkl/helper';
 import malkiss from './malkiss.vue';
 import { activeLinks } from '../utils/quicklinksBuilder';
 import { waitForPageToBeVisible } from '../utils/general';
+import { buildProviderUrl } from '../utils/slugs';
 
 export class SimklClass {
   page: any = null;
@@ -15,11 +15,15 @@ export class SimklClass {
 
   private malkiss;
 
+  protected logger;
+
   constructor(public url: string) {
+    this.logger = con.m('SimklClass', '#9b7400');
+
     utils.urlChangeDetect(() => {
       clearInterval(this.interval);
       this.interval = utils.waitUntilTrue(
-        function() {
+        function () {
           return (
             (!$('#global_div').length || parseInt($('#global_div').css('opacity')) === 1) &&
             (!$('#tvMainTable').length || parseInt($('#tvMainTable').css('opacity')) === 1)
@@ -33,7 +37,9 @@ export class SimklClass {
       );
     });
 
-    api.storage.addStyle(require('!to-string-loader!css-loader!less-loader!./style.less').toString());
+    api.storage.addStyle(
+      require('!to-string-loader!css-loader!less-loader!./style.less').toString(),
+    );
     $(document).ready(() => {
       this.init();
     });
@@ -66,36 +72,15 @@ export class SimklClass {
       con.log('page', this.page);
 
       if (!$('#malkiss').length)
-        $('.SimklTVAboutBlockTitle, .simkltvdetailmobilesummaryinfo').after(j.html('<div id="malkiss"></div>'));
-      if (this.malkiss) this.malkiss.$destroy();
-      this.malkiss = new Vue({
-        el: '#malkiss',
-        render: h => h(malkiss),
-      }).$children[0];
+        $('.SimklTVAboutBlockTitle, .simkltvdetailmobilesummaryinfo').after(
+          j.html('<div id="malkiss"></div>'),
+        );
+      if (this.malkiss) this.malkiss.$.appContext.app.unmount();
+      this.malkiss = createApp(malkiss, '#malkiss');
 
       this.streamingUI();
       this.malToKiss();
       this.pageRelation();
-      return;
-    }
-
-    if ((urlpart === 'anime' || urlpart === 'manga') && url2part === 'all') {
-      this.page = {
-        page: 'bookmarks',
-        type: urlpart,
-      };
-      this.bookmarksAnime();
-    }
-
-    if (url2part === 'anime' || url2part === 'manga') {
-      const status = utils.urlPart(this.url, 5);
-      if (status === 'watching') {
-        this.page = {
-          page: 'bookmarks',
-          type: url2part,
-        };
-        this.bookmarksProfile();
-      }
     }
   }
 
@@ -103,9 +88,9 @@ export class SimklClass {
     const urlpart = utils.urlPart(this.url, 3);
     if (urlpart === 'anime' || urlpart === 'manga') {
       const simklId = utils.urlPart(this.url, 4);
-      return helper.simklIdToMal(simklId).then(malId => {
+      return this.simklIdToMal(simklId).then(malId => {
         if (!malId) return '';
-        return `https://myanimelist.net/${urlpart}/${malId}/${utils.urlPart(this.url, 5)}`;
+        return buildProviderUrl('MAL', urlpart, malId);
       });
     }
     return '';
@@ -120,21 +105,23 @@ export class SimklClass {
     try {
       const code = utils.urlParam(this.url, 'code');
       if (!code) throw 'No code found!';
-      helper
-        .call(
-          'https://api.simkl.com/oauth/token',
-          JSON.stringify({
-            code,
-            client_id: helper.client_id,
-            client_secret: '3f883e8e6cdd60d2d5e765aaf0612953f743dc77f44c422af98b38e083cf038b',
-            redirect_uri: 'https://simkl.com/apps/chrome/mal-sync/connected/',
-            grant_type: 'authorization_code',
-          }),
-          false,
-          'POST',
-        )
+      this.call(
+        'https://api.simkl.com/oauth/token',
+        JSON.stringify({
+          code,
+          client_id: helper.client_id,
+          client_secret: __MAL_SYNC_KEYS__.simkl.secret,
+          redirect_uri: 'https://simkl.com/apps/chrome/mal-sync/connected/',
+          grant_type: 'authorization_code',
+        }),
+        false,
+        'POST',
+      )
         .then(access_token => {
-          if (typeof access_token.error !== 'undefined' || typeof access_token.access_token === 'undefined')
+          if (
+            typeof access_token.error !== 'undefined' ||
+            typeof access_token.access_token === 'undefined'
+          )
             throw access_token;
           return api.settings.set('simklToken', access_token.access_token);
         })
@@ -152,7 +139,9 @@ export class SimklClass {
 
     function ee(e) {
       con.error(e);
-      $('.firstStage .SimklTVKodititletext, .secondStage .SimklTVKodititletext').text('Something went wrong');
+      $('.firstStage .SimklTVKodititletext, .secondStage .SimklTVKodititletext').text(
+        'Something went wrong',
+      );
     }
   }
 
@@ -178,13 +167,18 @@ export class SimklClass {
     }
   }
 
+  getImage() {
+    return $('#detailPosterImg').attr('src');
+  }
+
+  getTitle() {
+    return $('h1').first().text().trim() || '';
+  }
+
   malToKiss() {
     con.log('malToKiss');
 
-    const title = $('h1')
-      .first()
-      .text()
-      .trim();
+    const title = this.getTitle();
 
     activeLinks(this.page!.type, this.page!.malid, title).then(links => {
       this.malkiss.links = links;
@@ -196,138 +190,9 @@ export class SimklClass {
     this.malkiss.pageRelation = this.page.malObj.getPageRelations();
   }
 
-  bookmarksProfile() {
-    const listProvider: UserList = new UserList(1, this.page!.type);
+  protected call = helper.call;
 
-    listProvider
-      .getCompleteList()
-      .then(list => {
-        $.each(list, async (index, en) => {
-          con.log('en', en);
-          const element = $(`a[href^="/${this.page!.type}/${en.uid}"]`);
-          if (!element || element.hasClass('malSyncDone2')) return;
-          element.addClass('malSyncDone2');
+  protected errorHandling = helper.errorHandling;
 
-          if (en.options && en.options.u) {
-            con.log(en.options.u);
-            element.after(
-              j.html(`
-            <a class="mal-sync-stream mal-rem" onclick="event.stopPropagation();" title="${
-              en.options.u.split('/')[2]
-            }" target="_blank" style="display: inline-block; height: 0; position: relative; top: -11px; margin-left: 5px;" href="${
-                en.options.u
-              }">
-              <img src="${utils.favicon(en.options.u.split('/')[2])}">
-            </a>`),
-            );
-
-            const resumeUrlObj = en.options.r;
-            const continueUrlObj = en.options.c;
-
-            const curEp = en.watchedEp;
-
-            con.log('Resume', resumeUrlObj, 'Continue', continueUrlObj);
-            if (continueUrlObj && continueUrlObj.ep === curEp + 1) {
-              element.parent().append(
-                j.html(
-                  `<a class="nextStream mal-rem" onclick="event.stopPropagation();" title="Continue watching" target="_blank" style="display: inline-block; height: 0; position: relative; top: -11px; margin-left: 5px; color: #BABABA;" href="${
-                    continueUrlObj.url
-                  }">
-                <img src="${api.storage.assetUrl('double-arrow-16px.png')}" width="16" height="16">
-              </a>`,
-                ),
-              );
-            } else if (resumeUrlObj && resumeUrlObj.ep === curEp) {
-              element.parent().append(
-                j.html(
-                  `<a class="resumeStream mal-rem" onclick="event.stopPropagation();" title="Resume watching" target="_blank" style="display: inline-block; height: 0; position: relative; top: -11px; margin-left: 5px; color: #BABABA;" href="${
-                    resumeUrlObj.url
-                  }">
-                <img src="${api.storage.assetUrl('arrow-16px.png')}" width="16" height="16">
-              </a>`,
-                ),
-              );
-            }
-          }
-        });
-      })
-      .catch(e => {
-        con.error(e);
-        listProvider.flashmError(e);
-      });
-  }
-
-  bookmarksAnime() {
-    const listProvider: UserList = new UserList(1, this.page!.type);
-
-    listProvider
-      .getCompleteList()
-      .then(list => {
-        exec();
-
-        this.interval2 = utils.changeDetect(
-          () => {
-            exec();
-          },
-          () => {
-            return $('#tv_best_left_addContainer li').length + $('#tv_best_left_addContainer > div').height()!;
-          },
-        );
-
-        function exec() {
-          con.info('list');
-          $.each(list, async (index, en) => {
-            const element = $(`#c${en.uid}`);
-            if (!element || !element.length || element.hasClass('malSyncDone2')) return;
-            element.addClass('malSyncDone2').css('position', 'relative');
-
-            if (en.options && en.options.u) {
-              con.log(en.options.u);
-              element.append(
-                j.html(`
-              <a class="mal-sync-stream mal-rem" onclick="event.stopPropagation();" title="${
-                en.options.u.split('/')[2]
-              }" target="_blank" style="position: absolute; z-index: 10; right: 0; top: 0; background-color: #00000057; padding: 5px;" href="${
-                  en.options.u
-                }">
-                <img src="${utils.favicon(en.options.u.split('/')[2])}">
-              </a>`),
-              );
-
-              const resumeUrlObj = en.options.r;
-              const continueUrlObj = en.options.c;
-
-              const curEp = en.watchedEp;
-
-              con.log('Resume', resumeUrlObj, 'Continue', continueUrlObj);
-              if (continueUrlObj && continueUrlObj.ep === curEp + 1) {
-                element.append(
-                  j.html(
-                    `<a class="nextStream mal-rem" onclick="event.stopPropagation();" title="Continue watching" target="_blank" style="position: absolute; z-index: 10; right: 0; top: 26px; background-color: #00000057; padding: 5px;" href="${
-                      continueUrlObj.url
-                    }">
-                  <img src="${api.storage.assetUrl('double-arrow-16px.png')}" width="16" height="16">
-                </a>`,
-                  ),
-                );
-              } else if (resumeUrlObj && resumeUrlObj.ep === curEp) {
-                element.append(
-                  j.html(
-                    `<a class="resumeStream mal-rem" onclick="event.stopPropagation();" title="Resume watching" target="_blank" style="position: absolute; z-index: 10; right: 0; top: 26px; background-color: #00000057; padding: 5px;" href="${
-                      resumeUrlObj.url
-                    }">
-                  <img src="${api.storage.assetUrl('arrow-16px.png')}" width="16" height="16">
-                </a>`,
-                  ),
-                );
-              }
-            }
-          });
-        }
-      })
-      .catch(e => {
-        con.error(e);
-        listProvider.flashmError(e);
-      });
-  }
+  protected simklIdToMal = helper.simklIdToMal;
 }

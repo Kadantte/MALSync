@@ -1,0 +1,31 @@
+{
+  "title": "StoneScape",
+  "url": "https://stonescape.xyz/",
+  "testCases": [
+    {
+      "url": "https://stonescape.xyz/series/player/ch-254",
+      "expected": {
+        "sync": true,
+        "title": "Player",
+        "identifier": "player",
+        "overviewUrl": "https://stonescape.xyz/series/player",
+        "episode": 254,
+        "uiSelector": false
+      }
+    },
+    {
+      "url": "https://stonescape.xyz/series/player",
+      "expected": {
+        "sync": false,
+        "title": "Player",
+        "identifier": "player",
+        "image": "https://stonescape.xyz/pub/covers/39be7d03-185f-40a2-9cdf-75c585165721.gif",
+        "uiSelector": true,
+        "epList": {
+          "1": "https://stonescape.xyz/series/player/ch-1",
+          "2": "https://stonescape.xyz/series/player/ch-2"
+        }
+      }
+    }
+  ]
+}

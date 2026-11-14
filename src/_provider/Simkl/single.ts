@@ -1,5 +1,7 @@
 import { SingleAbstract } from '../singleAbstract';
+import { buildProviderUrl, urlToSlug } from '../../utils/slugs';
 import * as helper from './helper';
+import * as definitions from '../definitions';
 import { NotAutenticatedError, NotFoundError, UrlNotSupportedError } from '../Errors';
 
 export class Single extends SingleAbstract {
@@ -23,29 +25,31 @@ export class Single extends SingleAbstract {
 
   shortName = 'Simkl';
 
-  authenticationUrl =
-    'https://simkl.com/oauth/authorize?response_type=code&client_id=39e8640b6f1a60aaf60f3f3313475e830517badab8048a4e52ff2d10deb2b9b0&redirect_uri=https://simkl.com/apps/chrome/mal-sync/connected/';
+  authenticationUrl = helper.getAuthUrl();
 
   protected rewatchingSupport = false;
 
+  protected datesSupport = false;
+
   protected handleUrl(url) {
-    if (url.match(/simkl\.com\/(anime|manga)\/\d*/i)) {
-      this.type = utils.urlPart(url, 3) === 'anime' ? 'anime' : 'manga';
-      this.ids.simkl = parseInt(utils.urlPart(url, 4));
-      if (this.type === 'manga') throw 'Simkl has no manga support';
+    const { path } = urlToSlug(url);
+    if (path?.provider === 'SIMKL') {
+      this.type = path.type;
+      this.ids.simkl = parseInt(path.id);
+      if (this.type === 'manga') throw new UrlNotSupportedError('Simkl has no manga support');
       return;
     }
-    if (url.match(/myanimelist\.net\/(anime|manga)\/\d*/i)) {
-      this.type = utils.urlPart(url, 3) === 'anime' ? 'anime' : 'manga';
-      this.ids.mal = Number(utils.urlPart(url, 4));
-      if (this.type === 'manga') throw 'Simkl has no manga support';
+    if (path?.provider === 'MAL') {
+      this.type = path.type;
+      this.ids.mal = Number(path.id);
+      if (this.type === 'manga') throw new UrlNotSupportedError('Simkl has no manga support');
       return;
     }
     throw new UrlNotSupportedError(url);
   }
 
   getCacheKey() {
-    return helper.getCacheKey(this.ids.mal, this.ids.simkl);
+    return this.getKey(['SIMKL']);
   }
 
   getPageId() {
@@ -57,10 +61,41 @@ export class Single extends SingleAbstract {
   }
 
   _setStatus(status) {
-    if (status === 23) status = 1;
+    if (status === definitions.status.Rewatching) {
+      status = definitions.status.Watching;
+    }
+    if (status === definitions.status.Considering && !this.supportsConsidering()) {
+      status = definitions.status.PlanToWatch;
+    }
     status = helper.translateList(status, parseInt(status.toString()));
-    if (status !== this.animeInfo.status) this.statusUpdate = true;
+    if (status !== this.animeInfo.status) {
+      this.statusUpdate = true;
+    }
     this.animeInfo.status = status;
+  }
+
+  _getStartDate(): never {
+    throw new Error('Simkl does not support Start Date');
+  }
+
+  _setStartDate(startDate) {
+    throw new Error('Simkl does not support Start Date');
+  }
+
+  _getFinishDate(): never {
+    throw new Error('Simkl does not support Finish Date');
+  }
+
+  _setFinishDate(finishDate) {
+    throw new Error('Simkl does not support Finish Date');
+  }
+
+  _getRewatchCount(): never {
+    throw new Error('Simkl does not support Rewatch Count');
+  }
+
+  _setRewatchCount(rewatchCount) {
+    throw new Error('Simkl does not support Rewatch Count');
   }
 
   _getScore() {
@@ -93,7 +128,9 @@ export class Single extends SingleAbstract {
   }
 
   _getEpisode() {
-    if (this._getStatus() === 2) return this._getTotalEpisodes();
+    if (this._getStatus() === definitions.status.Completed) {
+      return this._getTotalEpisodes();
+    }
     return this.curWatchedEp;
   }
 
@@ -135,7 +172,7 @@ export class Single extends SingleAbstract {
   }
 
   _getDisplayUrl() {
-    return `https://simkl.com/${this.getType()}/${this.ids.simkl}`;
+    return buildProviderUrl('SIMKL', this.getType()!, this.ids.simkl);
   }
 
   _getImage() {
@@ -185,12 +222,17 @@ export class Single extends SingleAbstract {
           this._onList = false;
           let el;
           if (de.simkl) {
-            el = await this.call(`https://api.simkl.com/anime/${de.simkl}`, { extended: 'full' }, true);
+            el = await this.call(
+              `https://api.simkl.com/anime/${de.simkl}`,
+              { extended: 'full' },
+              true,
+            );
             if (!el) throw new NotFoundError('Anime not found');
           } else {
             el = await this.call('https://api.simkl.com/search/id', de, true);
-            if (!el) throw new NotFoundError('Anime not found');
-            if (el[0].mal && el[0].mal.type && el[0].mal.type === 'Special') throw new Error('Is a special');
+            if (!el?.length) throw new NotFoundError('Anime not found');
+            if (el[0].mal && el[0].mal.type && el[0].mal.type === 'Special')
+              throw new Error('Is a special');
             el = el[0];
           }
 

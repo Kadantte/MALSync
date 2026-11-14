@@ -1,8 +1,5 @@
 import { AnilistClass } from '../anilist/anilistClass';
 import { firebaseNotification } from '../utils/firebaseNotification';
-import { initShark } from '../utils/shark';
-
-initShark();
 
 let lastFocus;
 
@@ -12,7 +9,7 @@ function main() {
   messageAniListListener(anilist);
   firebaseNotification();
 
-  $(window).blur(function() {
+  $(window).blur(function () {
     lastFocus = Date.now();
   });
 }
@@ -28,18 +25,20 @@ api.settings.init().then(() => {
 function messageAniListListener(anilist) {
   const logger = con.m('TabMalUrl');
   // @ts-ignore
-  chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
+  chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
     if (Date.now() - lastFocus < 3 * 1000) {
       if (msg.action === 'TabMalUrl') {
         logger.info('miniMAL');
         anilist.getMalUrl().then(malUrl => {
-          if (malUrl !== '') {
-            logger.log('TabMalUrl Message', malUrl);
-            sendResponse(malUrl);
-          } else if (api.settings.get('syncMode') === 'ANILIST') {
-            logger.log('TabUrl Message', anilist.url);
-            sendResponse(anilist.url);
+          const res = {
+            url: malUrl,
+            image: anilist.getImage(),
+            title: anilist.getTitle(),
+          };
+          if (!malUrl && api.settings.get('syncMode') === 'ANILIST') {
+            res.url = anilist.url;
           }
+          sendResponse(res);
         });
         return true;
       }

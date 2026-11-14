@@ -22,4 +22,13 @@ module.exports = {
       };
     });
   },
+  proxies: function() {
+    return ts.open('../../src/pages/scriptProxies.ts').proxies;
+  },
+  chibi: function(path = '../../src/pages-chibi/pages.ts') {
+    return ts.open(path).pages;
+  },
+  adult: function(path = '../../src/pages-adult/pages.ts') {
+    return ts.open(path).pages;
+  }
 };

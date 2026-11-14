@@ -1,0 +1,56 @@
+{
+    "title": "PhiliaScans",
+    "url": "https://philiascans.org",
+    "testCases": [
+      {
+        "url": "https://philiascans.org/series/sanctuary-of-the-unloved-noble-lady/chapter-8/",
+        "expected": {
+          "sync": true,
+          "title": "Sanctuary of the Unloved Noble Lady",
+          "identifier": "sanctuary-of-the-unloved-noble-lady",
+          "overviewUrl": "https://philiascans.org/series/sanctuary-of-the-unloved-noble-lady",
+          "image": "https://philiascans.org/api/covers/sanctuary-of-the-unloved-noble-lady",
+          "episode": 8,
+          "nextEpUrl": "https://philiascans.org/series/sanctuary-of-the-unloved-noble-lady/chapter-9?lang=en",
+          "uiSelector": false
+        }
+      },
+      {
+        "url": "https://philiascans.org/series/sanctuary-of-the-unloved-noble-lady/",
+        "expected": {
+          "sync": false,
+          "title": "Sanctuary of the Unloved Noble Lady",
+          "identifier": "sanctuary-of-the-unloved-noble-lady",
+          "image": "https://philiascans.org/api/covers/sanctuary-of-the-unloved-noble-lady",
+          "uiSelector": true
+        }
+      },
+      {
+        "url": "https://philiascans.org/series/darkened-hero-hidden-boss-hunt/chapter-7-1/",
+        "expected": {
+          "sync": true,
+          "title": "Darkened Hero: Hidden Boss Hunt",
+          "identifier": "darkened-hero-hidden-boss-hunt",
+          "overviewUrl": "https://philiascans.org/series/darkened-hero-hidden-boss-hunt",
+          "image": "https://philiascans.org/api/covers/darkened-hero-hidden-boss-hunt",
+          "episode": 7,
+          "nextEpUrl": "https://philiascans.org/series/darkened-hero-hidden-boss-hunt/chapter-7-5?lang=en",
+          "uiSelector": false
+        }
+      },
+      {
+        "url": "https://philiascans.org/series/darkened-hero-hidden-boss-hunt/",
+        "expected": {
+          "sync": false,
+          "title": "Darkened Hero: Hidden Boss Hunt",
+          "identifier": "darkened-hero-hidden-boss-hunt",
+          "image": "https://philiascans.org/api/covers/darkened-hero-hidden-boss-hunt",
+          "uiSelector": true,
+          "epList": {
+            "10" : "https://philiascans.org/series/darkened-hero-hidden-boss-hunt/chapter-10/",
+            "11" : "https://philiascans.org/series/darkened-hero-hidden-boss-hunt/chapter-11/"
+          }
+        }
+      }
+    ]
+  }

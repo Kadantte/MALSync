@@ -1,139 +1,149 @@
-import { expect } from 'chai';
-import * as request from 'request';
 import { Single } from '../../../../src/_provider/AniList/single';
-import * as utils from '../../../../src/utils/general';
-import * as def from '../../../../src/_provider/definitions';
-
 import { generalSingleTests } from '../generalSingleTests.exclude';
+import { setConAndUtils, createProviderApi, createFixtureXhr } from '../../utils/singleNetworkStub';
+
+const fixtures = [
+  {
+    method: 'POST',
+    url: 'https://graphql.anilist.co',
+    body: /"id":21,/,
+    response: {
+      data: {
+        Media: {
+          id: 21,
+          idMal: 21,
+          title: { userPreferred: 'One Piece' },
+          siteUrl: 'https://anilist.co/anime/21/One-Piece',
+          episodes: null,
+          chapters: null,
+          volumes: null,
+          averageScore: 87,
+          coverImage: { large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/b21.jpg' },
+          mediaListEntry: {
+            id: 1,
+            status: 'CURRENT',
+            startedAt: { year: null, month: null, day: null },
+            completedAt: { year: null, month: null, day: null },
+            progress: 0,
+            progressVolumes: 0,
+            score: 0,
+            repeat: 0,
+            notes: '',
+          },
+        },
+      },
+    },
+  },
+  {
+    method: 'POST',
+    url: 'https://graphql.anilist.co',
+    body: /"id":20,/,
+    response: {
+      data: {
+        Media: {
+          id: 20,
+          idMal: 20,
+          title: { userPreferred: 'Naruto' },
+          siteUrl: 'https://anilist.co/anime/20/Naruto',
+          episodes: 220,
+          chapters: null,
+          volumes: null,
+          averageScore: 79,
+          coverImage: { large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/b20.jpg' },
+          mediaListEntry: null,
+        },
+      },
+    },
+  },
+  {
+    method: 'POST',
+    url: 'https://graphql.anilist.co',
+    body: /"id":999999999,/,
+    response: { errors: [{ status: 404, message: 'Not Found.' }] },
+  },
+  {
+    method: 'POST',
+    url: 'https://graphql.anilist.co',
+    body: /"id":1535,/,
+    response: {
+      data: {
+        Media: {
+          id: 1535,
+          idMal: 1535,
+          title: { userPreferred: 'Death Note' },
+          siteUrl: 'https://anilist.co/anime/1535/Death-Note',
+          episodes: 37,
+          chapters: null,
+          volumes: null,
+          averageScore: 84,
+          coverImage: { large: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/b1535.jpg' },
+          mediaListEntry: {
+            id: 2,
+            status: 'CURRENT',
+            startedAt: { year: null, month: null, day: null },
+            completedAt: { year: null, month: null, day: null },
+            progress: 0,
+            progressVolumes: 0,
+            score: 0,
+            repeat: 0,
+            notes: '',
+          },
+        },
+      },
+    },
+  },
+];
 
 setGlobals();
 function setGlobals() {
-  global.con = require('../../../../src/utils/console');
-  global.con.log = function() {};
-  global.con.error = function() {};
-  global.con.info = function() {};
-
-  global.api = {
-    token: process.env.ANILIST_API_KEY,
-    settings: {
-      get(key) {
-        if ('anilistToken') return global.api.token;
-        throw 'key not defined';
-      },
-    },
-    storage: {
-      get(key) {
-        if (key.indexOf('continue') !== -1) return '';
-        if (key.indexOf('resume') !== -1) return '';
-        if (key.indexOf('tagSettings') !== -1) return '';
-        throw '[storage] key not found '+key;
-      }
-    },
-    status: 200,
-    request: {
-      async xhr(post, conf, data) {
-        return new Promise(function(resolve, reject) {
-          const options = {
-            url: conf.url,
-            headers: conf.headers,
-            body: conf.data,
-          };
-          request.post(options, (error, response, body) => {
-            resolve({
-              responseText: body,
-              status: global.api.status,
-            });
-          });
-        });
-      },
-    },
-  };
-
-  global.btoa = input => input;
-
-  global.utils = utils;
+  setConAndUtils();
+  global.api = createProviderApi({ tokenKey: 'anilistToken', xhr: createFixtureXhr(fixtures) });
 
   global.testData = {
     urlTest: [
-      {
-        url: 'https://anilist.co/manga/78397/No-Game-No-Life/',
-        error: false,
-        type: 'manga',
-      },
-      {
-        url: 'https://anilist.co/anime/19815/No-Game-No-Life/',
-        error: false,
-        type: 'anime',
-      },
-      {
-        url: 'https://myanimelist.net/anime/19815/No_Game_No_Life',
-        error: false,
-        type: 'anime',
-      },
-      {
-        url: 'https://kitsu.io/anime/no-game-no-life',
-        error: true,
-        type: 'anime',
-      },
-      {
-        url: 'https://simkl.com/anime/46128/no-game-no-life',
-        error: true,
-        type: 'anime',
-      },
+      { url: 'https://anilist.co/anime/21/One-Piece', error: false, type: 'anime' },
+      { url: 'https://anilist.co/manga/2/Berserk', error: false, type: 'manga' },
+      // AniList's handleUrl also accepts bare MAL urls as a cross-link.
+      { url: 'https://myanimelist.net/anime/21/One_Piece', error: false, type: 'anime' },
+      { url: 'https://kitsu.app/anime/one-piece', error: true, type: 'anime' },
+      { url: 'https://simkl.com/anime/38636/one-piece', error: true, type: 'anime' },
+      { url: 'https://shikimori.one/animes/21-one-piece', error: true, type: 'anime' },
+      { url: 'https://mangabaka.org/21', error: true, type: 'anime' },
     ],
     apiTest: {
       defaultUrl: {
-        url: 'https://anilist.co/anime/21/One-Piece/',
-        displayUrl: 'https://anilist.co/anime/21',
-        malUrl: 'https://myanimelist.net/anime/21/One%20Piece',
+        url: 'https://anilist.co/anime/21/One-Piece',
+        displayUrl: 'https://anilist.co/anime/21/One-Piece',
+        malUrl: 'https://myanimelist.net/anime/21',
         title: 'One Piece',
         eps: 0,
         vol: 0,
-        image:
-          'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/nx21-tXMN3Y20PIL9.jpg',
-        rating: 83,
+        image: 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/b21.jpg',
+        rating: 87,
         cacheKey: 21,
       },
       notOnListUrl: {
-        url: 'https://anilist.co/anime/10083/Shiki-Specials/',
-        displayUrl: 'https://anilist.co/anime/10083',
-        malUrl: 'https://myanimelist.net/anime/10083/Shiki%20Specials',
-        title: 'Shiki Specials',
-        eps: 2,
-        vol: 0,
-      },
-      noMalEntry: {
-        url:
-          'https://anilist.co/manga/115067/Kagami-no-Kuni-no-Iris-SCP-Foundation/',
-        displayUrl: 'https://anilist.co/manga/115067',
-        title: 'Kagami no Kuni no Iris: SCP Foundation',
-        eps: 0,
-        vol: 0,
-        cacheKey: 'anilist:115067',
-      },
-      malUrl: {
-        url: 'https://myanimelist.net/anime/21/One_Piece',
-        malUrl: 'https://myanimelist.net/anime/21/One%20Piece',
-        displayUrl: 'https://anilist.co/anime/21',
-        title: 'One Piece',
-        eps: 0,
+        url: 'https://anilist.co/anime/20/Naruto',
+        displayUrl: 'https://anilist.co/anime/20/Naruto',
+        malUrl: 'https://myanimelist.net/anime/20',
+        title: 'Naruto',
+        eps: 220,
         vol: 0,
       },
       nonExistingMAL: {
-        url: 'https://myanimelist.net/anime/13371337',
+        url: 'https://anilist.co/anime/999999999/Nonexistent',
       },
       hasTotalEp: {
-        url: 'https://anilist.co/anime/20954/Koe-no-Katachi/',
+        url: 'https://anilist.co/anime/1535/Death-Note',
       },
     },
   };
 }
 
-if(!process.env.ANILIST_API_KEY) return;
-
-describe('AniList single', function() {
+describe('AniList Single', function() {
   before(function() {
     setGlobals();
   });
+
   generalSingleTests(Single, setGlobals);
 });

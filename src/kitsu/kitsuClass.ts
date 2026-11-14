@@ -1,26 +1,25 @@
+import type { listElement } from '../_provider/listAbstract';
 import { Single as KitsuSingle } from '../_provider/Kitsu/single';
 import { UserList } from '../_provider/Kitsu/list';
 import { activeLinks, removeFromOptions } from '../utils/quicklinksBuilder';
 import { waitForPageToBeVisible } from '../utils/general';
+import { buildProviderUrl } from '../utils/slugs';
+import { NotAutenticatedError } from '../_provider/Errors';
 
 export class KitsuClass {
   page: any = null;
 
   same = false;
 
+  protected authError = false;
+
   constructor(public url: string) {
-    let oldUrl = window.location.href
-      .split('/')
-      .slice(0, 5)
-      .join('/');
+    let oldUrl = window.location.href.split('/').slice(0, 5).join('/');
     utils.changeDetect(
       () => {
         this.same = false;
         if (this.page !== null && this.page.page === 'detail') {
-          const tempUrl = window.location.href
-            .split('/')
-            .slice(0, 5)
-            .join('/');
+          const tempUrl = window.location.href.split('/').slice(0, 5).join('/');
           if (tempUrl === oldUrl) {
             this.same = true;
           }
@@ -32,9 +31,7 @@ export class KitsuClass {
       },
       () => {
         if (this.page !== null && this.page.page === 'bookmarks' && $('.library-content').length) {
-          return $('.library-content')
-            .first()
-            .height();
+          return $('.library-content').first().height();
         }
 
         return window.location.href;
@@ -43,7 +40,7 @@ export class KitsuClass {
 
     $(document).ready(() => {
       utils.waitUntilTrue(
-        function() {
+        function () {
           return $('.global-container').length;
         },
         () => {
@@ -52,7 +49,9 @@ export class KitsuClass {
       );
     });
 
-    api.storage.addStyle(require('!to-string-loader!css-loader!less-loader!./style.less').toString());
+    api.storage.addStyle(
+      require('!to-string-loader!css-loader!less-loader!./style.less').toString(),
+    );
   }
 
   async init() {
@@ -105,7 +104,7 @@ export class KitsuClass {
     } catch (e) {
       con.error(e);
     }
-    $(document).ready(function() {
+    $(document).ready(function () {
       $('body').after(
         j.html(
           `
@@ -130,11 +129,11 @@ export class KitsuClass {
       `,
         ),
       );
-      $('#mal-sync-login #mal-sync-button').click(function() {
+      $('#mal-sync-login #mal-sync-button').click(function () {
         $('#mal-sync-login #mal-sync-button').attr('disabled', 'disabled');
         $.ajax({
           type: 'POST',
-          url: 'https://kitsu.io/api/oauth/token',
+          url: 'https://kitsu.app/api/oauth/token',
           data: `grant_type=password&username=${encodeURIComponent(
             String($('#mal-sync-login #email').val()),
           )}&password=${encodeURIComponent(String($('#mal-sync-login #pass').val()))}`,
@@ -148,7 +147,9 @@ export class KitsuClass {
             await api.settings.set('kitsuToken', token);
 
             $('#mal-sync-login').html(
-              j.html(`<h1>MAL-Sync</h1><br>${api.storage.lang('kitsuClass_authentication_Success')}`),
+              j.html(
+                `<h1>MAL-Sync</h1><br>${api.storage.lang('kitsuClass_authentication_Success')}`,
+              ),
             );
           },
           error(result) {
@@ -169,7 +170,7 @@ export class KitsuClass {
       });
 
       utils.waitUntilTrue(
-        function() {
+        function () {
           return $('body h1').length;
         },
         () => {
@@ -181,7 +182,7 @@ export class KitsuClass {
 
   async getMalUrl() {
     if (this.page !== null && this.page.page === 'detail' && this.page.malid) {
-      return `https://myanimelist.net/${this.page.type}/${this.page.malid}/${utils.urlPart(this.url, 5)}`;
+      return buildProviderUrl('MAL', this.page.type, this.page.malid);
     }
     return '';
   }
@@ -193,7 +194,7 @@ export class KitsuClass {
 
     const streamUrl = malObj.getStreamingUrl();
     if (streamUrl) {
-      $(document).ready(async function() {
+      $(document).ready(async function () {
         $('.media--title h3')
           .first()
           .after(
@@ -215,7 +216,9 @@ export class KitsuClass {
             j.html(
               `<a class="nextStream" title="${api.storage.lang(
                 `overview_Continue_${malObj.getType()}`,
-              )}" target="_blank" style="margin: 0 5px 0 0; color: #BABABA;" href="${continueUrlObj.url}">
+              )}" target="_blank" style="margin: 0 5px 0 0; color: #BABABA;" href="${
+                continueUrlObj.url
+              }">
               <img src="${api.storage.assetUrl('double-arrow-16px.png')}" width="16" height="16">
             </a>`,
             ),
@@ -225,7 +228,9 @@ export class KitsuClass {
             j.html(
               `<a class="resumeStream" title="${api.storage.lang(
                 `overview_Resume_Episode_${malObj.getType()}`,
-              )}" target="_blank" style="margin: 0 5px 0 0; color: #BABABA;" href="${resumeUrlObj.url}">
+              )}" target="_blank" style="margin: 0 5px 0 0; color: #BABABA;" href="${
+                resumeUrlObj.url
+              }">
               <img src="${api.storage.assetUrl('arrow-16px.png')}" width="16" height="16">
             </a>`,
             ),
@@ -235,11 +240,19 @@ export class KitsuClass {
     }
   }
 
+  getImage() {
+    return j.$('.media-poster img').attr('src') || '';
+  }
+
+  getTitle() {
+    return $('meta[property="og:title"]').attr('content') || '';
+  }
+
   malToKiss() {
     $(document).ready(() => {
       con.log('malToKiss');
       $('.mal_links').remove();
-      const title = $('meta[property="og:title"]').attr('content')!;
+      const title = this.getTitle();
 
       activeLinks(this.page!.type, this.page!.apiCacheKey, title).then(links => {
         let html = '';
@@ -262,26 +275,26 @@ export class KitsuClass {
               padding: 8px 12px;
               width: 100%;
               font-size: 12px;
-
+              word-break: break-all;
             ">
               <img src="${utils.favicon(page.domain)}">
-              <span style="font-weight: 500; line-height: 16px; vertical-align: middle;">${page.name}</span>
-              <span title="${page.name}" class="remove-mal-sync" style="float: right; cursor: pointer;">x</span>
+              <span style="font-weight: 500; line-height: 16px; vertical-align: middle;">${
+                page.name
+              }</span>
+              <span title="${
+                page.name
+              }" class="remove-mal-sync" style="float: right; cursor: pointer;">x</span>
               ${tempHtml}
             </div>`;
         });
 
         if ($('#mal-sync-search-links').length) {
-          $('#mal-sync-search-links')
-            .first()
-            .after(j.html(html));
+          $('#mal-sync-search-links').first().after(j.html(html));
         } else {
-          $('.media-summary')
-            .first()
-            .after(j.html(html));
+          $('.media-summary').first().after(j.html(html));
         }
 
-        $('.remove-mal-sync').click(function() {
+        $('.remove-mal-sync').click(function () {
           const key = $(this).attr('title');
           removeFromOptions(String(key));
           window.location.reload();
@@ -297,7 +310,7 @@ export class KitsuClass {
       .first()
       .append(
         j.html(
-          `<div class="malsync-rel-link" style="display: inline-block; margin: 0 5px; vertical-align: bottom;"></div>`,
+          '<div class="malsync-rel-link" style="display: inline-block; margin: 0 5px; vertical-align: bottom; user-select: none;"></div>',
         ),
       );
 
@@ -318,6 +331,7 @@ export class KitsuClass {
   private tempMangalist: any = null;
 
   bookmarks() {
+    if (this.authError) return;
     const This = this;
     $(document).ready(() => {
       if (this.page!.type === 'anime') {
@@ -343,6 +357,7 @@ export class KitsuClass {
           fullListCallback(list);
         })
         .catch(e => {
+          if (e instanceof NotAutenticatedError) this.authError = true;
           con.error(e);
           listProvider.flashmError(e);
         });
@@ -351,13 +366,15 @@ export class KitsuClass {
         let cover = true;
         if ($('.library-list tbody tr').length) cover = false;
         con.log(list);
-        $.each(list, async (index, en) => {
+        $.each(list, async (index, en: listElement & { kitsuSlug: string }) => {
           con.log('en', en);
           if (typeof en.malId !== 'undefined' && en.malId !== null && en.malId) {
             const element = $(
               `.library-grid-popover:not(.malSyncDone2) a[href^="/${This.page!.type}/${
                 en.kitsuSlug
-              }"], .library-list tbody tr:not(.malSyncDone2) a[href^="/${This.page!.type}/${en.kitsuSlug}"]`,
+              }"], .library-list tbody tr:not(.malSyncDone2) a[href^="/${This.page!.type}/${
+                en.kitsuSlug
+              }"]`,
             )
               .first()
               .parent()
@@ -392,8 +409,8 @@ export class KitsuClass {
               }
             }
 
-            const resumeUrlObj = en.options.r;
-            const continueUrlObj = en.options.c;
+            const resumeUrlObj = en.options!.r;
+            const continueUrlObj = en.options!.c;
 
             const curEp = en.watchedEp;
 
@@ -405,7 +422,9 @@ export class KitsuClass {
                     `<a class="nextStream mal-rem" title="Continue watching" target="_blank" style="color: #BABABA; z-index: 22; position:absolute; top: 0px; left: 26px; background-color: #ffffff5c; padding: 0 5px 3px 5px;" href="${
                       continueUrlObj.url
                     }">
-                    <img src="${api.storage.assetUrl('double-arrow-16px.png')}" width="16" height="16">
+                    <img src="${api.storage.assetUrl(
+                      'double-arrow-16px.png',
+                    )}" width="16" height="16">
                   </a>`,
                   ),
                 );
@@ -415,7 +434,9 @@ export class KitsuClass {
                     `<a class="nextStream mal-rem" title="Continue watching" target="_blank" style="padding: 0;" href="${
                       continueUrlObj.url
                     }">
-                    <img src="${api.storage.assetUrl('double-arrow-16px.png')}" width="16" height="16">
+                    <img src="${api.storage.assetUrl(
+                      'double-arrow-16px.png',
+                    )}" width="16" height="16">
                   </a>`,
                   ),
                 );
@@ -445,14 +466,14 @@ export class KitsuClass {
             }
 
             await en.fn.initProgress();
-            if (en.fn.progress && en.fn.progress.isAiring() && en.fn.progress.getCurrentEpisode()) {
+            if (en.fn.progress?.isAiring() && en.fn.progress.progress()?.getCurrentEpisode()) {
               element
                 .parent()
                 .find('.entry-unit, .progress-cell > span:last-of-type')
                 .first()
                 .append(
                   j.html(
-                    ` <span class="mal-sync-ep-pre" title="${en.fn.progress.getAutoText()}">[<span style="border-bottom: 1px dotted ${en.fn.progress.getColor()};">${en.fn.progress.getCurrentEpisode()}</span>]</span>`,
+                    ` <span class="mal-sync-ep-pre" title="${en.fn.progress.progress()!.getAutoText()}">[<span style="border-bottom: 1px dotted ${en.fn.progress.getColor()};">${en.fn.progress.progress()!.getCurrentEpisode()!}</span>]</span>`,
                   ),
                 );
             }

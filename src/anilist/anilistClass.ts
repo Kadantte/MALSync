@@ -1,18 +1,20 @@
-import Vue from 'vue';
-import VueDOMPurifyHTML from 'vue-dompurify-html';
+import { createApp } from '../utils/Vue';
 import * as helper from '../provider/AniList/helper';
 import { Single as AniListSingle } from '../_provider/AniList/single';
 import { UserList } from '../_provider/AniList/list';
 import { activeLinks, removeFromOptions } from '../utils/quicklinksBuilder';
 import updateUi from './updateUi.vue';
 import { waitForPageToBeVisible } from '../utils/general';
-
-Vue.use(VueDOMPurifyHTML, { default: { ADD_ATTR: ['target'] } });
+import { buildProviderUrl } from '../utils/slugs';
+import { NotAutenticatedError } from '../_provider/Errors';
+import type { listElement } from '../_provider/listAbstract';
 
 export class AnilistClass {
   page: any = null;
 
   private vueEl;
+
+  protected authError = false;
 
   constructor(public url: string) {
     let first = true;
@@ -27,16 +29,11 @@ export class AnilistClass {
           return undefined;
         }
         if (this.page !== null && this.page.page === 'bookmarks' && $('.lists').length) {
-          return $('.lists')
-            .first()
-            .height();
+          return $('.lists').first().height();
         }
         let ogUrl = $('meta[property="og:url"]').attr('content');
         if (typeof ogUrl !== 'undefined' && ogUrl.split('/').length > 4) {
-          return ogUrl
-            .split('/')
-            .slice(0, 6)
-            .join('/');
+          return ogUrl.split('/').slice(0, 6).join('/');
         }
         ogUrl = window.location.href;
 
@@ -74,19 +71,13 @@ export class AnilistClass {
       },
     );
 
-    if (this.url.indexOf('access_token=') > -1) {
-      this.init();
-    }
-
-    api.storage.addStyle(require('!to-string-loader!css-loader!less-loader!./style.less').toString());
+    api.storage.addStyle(
+      require('!to-string-loader!css-loader!less-loader!./style.less').toString(),
+    );
   }
 
   async init() {
     await waitForPageToBeVisible();
-
-    if (this.url.indexOf('access_token=') > -1) {
-      this.authentication();
-    }
 
     const urlpart = utils.urlPart(this.url, 3);
     if (urlpart === 'anime' || urlpart === 'manga') {
@@ -118,59 +109,35 @@ export class AnilistClass {
     }
   }
 
-  async authentication() {
-    try {
-      utils.checkDoubleExecution();
-    } catch (e) {
-      con.error(e);
-    }
-    const tokens = /access_token=[^&]+/gi.exec(this.url);
-    if (tokens !== null && typeof tokens[0] !== 'undefined' && tokens[0]) {
-      const token = tokens[0].toString().replace(/access_token=/gi, '');
-      con.log('Token Found', token);
-
-      await api.settings.set('anilistToken', token);
-
-      $(document).ready(function() {
-        $('.page-content .container').html(
-          j.html(
-            `
-          <div style="text-align: center; margin-top: 50px; background-color: white; border: 1px solid lightgrey; padding: 10px;">
-            <h1>MAL-Sync</h1>
-            <br>
-            ${api.storage.lang('anilistClass_authentication')}
-          </div>
-        `,
-          ),
-        );
-      });
-    }
-  }
-
   async getMalUrl() {
     const urlpart = utils.urlPart(this.url, 3);
     if (urlpart === 'anime' || urlpart === 'manga') {
       const aniListId = utils.urlPart(this.url, 4);
       return helper.aniListToMal(Number(aniListId), urlpart).then(malId => {
         if (!malId) return '';
-        return `https://myanimelist.net/${urlpart}/${malId}/${utils.urlPart(this.url, 5)}`;
+        return buildProviderUrl('MAL', urlpart, malId);
       });
     }
     return '';
   }
 
+  getImage() {
+    return $('.header .cover').attr('src') || '';
+  }
+
+  getTitle() {
+    return $('h1').first().clone().children().remove().end().text().trim();
+  }
+
   malToKiss() {
+    if (!api.settings.get('anilistExternalSources')) {
+      con.log('Quicklinks disabled by settings');
+      return;
+    }
     $(document).ready(() => {
       con.log('malToKiss');
       $('.mal_links').remove();
-      const title = $('h1')
-        .first()
-        .clone()
-        .children()
-        .remove()
-        .end()
-        .text()
-        .trim();
+      const title = this.getTitle();
 
       activeLinks(this.page!.type, this.page!.apiCacheKey, title).then(links => {
         let html = '';
@@ -196,10 +163,12 @@ export class AnilistClass {
               margin-top: 16px;
               font-size: 1.2rem;
               position: relative;
-
+              word-break: break-all;
             ">
               <img src="${utils.favicon(page.domain)}" height="16" width="16">
-              <span style="font-weight: 500; line-height: 16px; vertical-align: middle;">${page.name}</span>
+              <span style="font-weight: 500; line-height: 16px; vertical-align: middle;">${
+                page.name
+              }</span>
               <span title="${
                 page.name
               }" class="remove-mal-sync" title="remove" style="position: absolute; top: 2px; right: 5px; cursor: pointer; opacity: 0.4;">x</span>
@@ -213,7 +182,7 @@ export class AnilistClass {
         } else {
           $('.sidebar .data').before(j.html(html));
         }
-        $('.remove-mal-sync').click(function() {
+        $('.remove-mal-sync').click(function () {
           const key = $(this).attr('title');
           removeFromOptions(String(key));
           window.location.reload();
@@ -232,9 +201,14 @@ export class AnilistClass {
     this.initVue(malObj);
     this.pageRelation(malObj);
 
+    if (!api.settings.get('anilistExternalSources')) {
+      con.log('Streaming UI disabled by settings');
+      return;
+    }
+
     const streamUrl = malObj.getStreamingUrl();
     if (streamUrl) {
-      $(document).ready(async function() {
+      $(document).ready(async function () {
         $('#mal-sync-stream-div').remove();
         $('h1')
           .first()
@@ -257,7 +231,9 @@ export class AnilistClass {
             j.html(
               `<a class="nextStream" title="${api.storage.lang(
                 `overview_Continue_${malObj.getType()}`,
-              )}" target="_blank" style="margin: 0 5px 0 0; color: #BABABA;" href="${continueUrlObj.url}">
+              )}" target="_blank" style="margin: 0 5px 0 0; color: #BABABA;" href="${
+                continueUrlObj.url
+              }">
               <img src="${api.storage.assetUrl('double-arrow-16px.png')}" width="16" height="16">
             </a>`,
             ),
@@ -267,7 +243,9 @@ export class AnilistClass {
             j.html(
               `<a class="resumeStream" title="${api.storage.lang(
                 `overview_Resume_Episode_${malObj.getType()}`,
-              )}" target="_blank" style="margin: 0 5px 0 0; color: #BABABA;" href="${resumeUrlObj.url}">
+              )}" target="_blank" style="margin: 0 5px 0 0; color: #BABABA;" href="${
+                resumeUrlObj.url
+              }">
               <img src="${api.storage.assetUrl('arrow-16px.png')}" width="16" height="16">
             </a>`,
             ),
@@ -278,12 +256,19 @@ export class AnilistClass {
   }
 
   async pageRelation(malObj) {
+    if (!api.settings.get('anilistExternalSources')) {
+      con.log('Page Relation disabled by settings');
+      return;
+    }
+
     await malObj.fillRelations();
 
     $('.malsync-rel-link').remove();
     $('h1')
       .first()
-      .append(j.html(`<div class="malsync-rel-link" style="float: right;"></div>`));
+      .append(
+        j.html('<div class="malsync-rel-link" style="float: right; user-select: none;"></div>'),
+      );
 
     malObj.getPageRelations().forEach(page => {
       $('.malsync-rel-link').append(
@@ -302,29 +287,21 @@ export class AnilistClass {
   private tempMangalist: any = null;
 
   bookmarks() {
+    if (this.authError) return;
     const This = this;
     $(document).ready(() => {
       $('.list-entries .entry, .list-entries .entry-card')
         .not('.malSyncDone')
         .each((index, el) => {
           $(el).addClass('malSyncDone');
-          let label = $(el)
-            .find('.notes')
-            .first()
-            .attr('label');
+          let label = $(el).find('.notes').first().attr('label');
 
           if (typeof label !== 'undefined') {
             label = label.replace(/(malSync|last)::[\d\D]+::/, '').replace(/#,/, '');
             if (label.trim() === '' || label.trim() === ',') {
-              $(el)
-                .find('.notes')
-                .first()
-                .css('visibility', 'hidden');
+              $(el).find('.notes').first().css('visibility', 'hidden');
             } else {
-              $(el)
-                .find('.notes')
-                .first()
-                .attr('label', label);
+              $(el).find('.notes').first().attr('label', label);
             }
           }
         });
@@ -352,13 +329,14 @@ export class AnilistClass {
           fullListCallback(list);
         })
         .catch(e => {
+          if (e instanceof NotAutenticatedError) this.authError = true;
           con.error(e);
           listProvider.flashmError(e);
         });
 
       function fullListCallback(list) {
         con.log(list);
-        $.each(list, async (index, en) => {
+        $.each(list, async (index, en: listElement) => {
           const tempEl = $(
             `.entry:not(.malSyncDone2) a[href^="/${This.page!.type}/${
               en.uid
@@ -368,6 +346,11 @@ export class AnilistClass {
             const element = tempEl.first().parent();
 
             element.parent().addClass('malSyncDone2');
+
+            if (!api.settings.get('anilistExternalSources')) {
+              con.log('Page Relation disabled by settings');
+              en.options = { r: null, c: null, u: null } as any;
+            }
 
             if (en.options && en.options.u) {
               con.log(en.options.u);
@@ -384,8 +367,8 @@ export class AnilistClass {
                 );
             }
 
-            const resumeUrlObj = en.options.r;
-            const continueUrlObj = en.options.c;
+            const resumeUrlObj = en.options!.r;
+            const continueUrlObj = en.options!.c;
 
             const curEp = en.watchedEp;
 
@@ -396,7 +379,9 @@ export class AnilistClass {
                   `<a class="nextStream mal-rem" title="Continue watching" target="_blank" style="margin: -2px 5px 0 0; color: #BABABA;" href="${
                     continueUrlObj.url
                   }">
-                  <img src="${api.storage.assetUrl('double-arrow-16px.png')}" width="16" height="16">
+                  <img src="${api.storage.assetUrl(
+                    'double-arrow-16px.png',
+                  )}" width="16" height="16">
                 </a>`,
                 ),
               );
@@ -413,14 +398,14 @@ export class AnilistClass {
             }
 
             await en.fn.initProgress();
-            if (en.fn.progress && en.fn.progress.isAiring() && en.fn.progress.getCurrentEpisode()) {
+            if (en.fn.progress?.isAiring() && en.fn.progress.progress()?.getCurrentEpisode()) {
               element
                 .parent()
                 .find('.progress')
                 .first()
                 .append(
                   j.html(
-                    ` <span class="mal-sync-ep-pre" title="${en.fn.progress.getAutoText()}">[<span style="border-bottom: 1px dotted ${en.fn.progress.getColor()};">${en.fn.progress.getCurrentEpisode()}</span>]</span>`,
+                    ` <span class="mal-sync-ep-pre" title="${en.fn.progress.progress()!.getAutoText()}">[<span style="border-bottom: 1px dotted ${en.fn.progress.getColor()};">${en.fn.progress.progress()!.getCurrentEpisode()!}</span>]</span>`,
                   ),
                 );
             }
@@ -434,16 +419,11 @@ export class AnilistClass {
     if (!api.settings.get('anilistUpdateUi')) return;
 
     if (!$('#malsync-update-ui').length)
-      $('.sidebar')
-        .first()
-        .prepend(j.html('<div id="malsync-update-ui"></div>'));
+      $('.sidebar').first().prepend(j.html('<div id="malsync-update-ui"></div>'));
 
-    if (this.vueEl) this.vueEl.$destroy();
+    if (this.vueEl) this.vueEl.$.appContext.app.unmount();
 
-    [this.vueEl] = new Vue({
-      el: '#malsync-update-ui',
-      render: h => h(updateUi),
-    }).$children;
+    this.vueEl = createApp(updateUi, '#malsync-update-ui');
 
     this.vueEl.malObj = malObj;
   }

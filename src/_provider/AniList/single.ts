@@ -1,4 +1,6 @@
 import { SingleAbstract } from '../singleAbstract';
+import { urlToSlug } from '../../utils/slugs';
+import * as definitions from '../definitions';
 import * as helper from './helper';
 import { NotAutenticatedError, UrlNotSupportedError } from '../Errors';
 import { point100 } from '../ScoreMode/point100';
@@ -20,24 +22,26 @@ export class Single extends SingleAbstract {
 
   shortName = 'AniList';
 
-  authenticationUrl = 'https://anilist.co/api/v2/oauth/authorize?client_id=1487&response_type=token';
+  authenticationUrl =
+    'https://anilist.co/api/v2/oauth/authorize?client_id=1487&response_type=token';
 
   protected handleUrl(url) {
-    if (url.match(/anilist\.co\/(anime|manga)\/\d*/i)) {
-      this.type = utils.urlPart(url, 3) === 'anime' ? 'anime' : 'manga';
-      this.ids.ani = Number(utils.urlPart(url, 4));
+    const { path } = urlToSlug(url);
+    if (path?.provider === 'ANILIST') {
+      this.type = path.type;
+      this.ids.ani = Number(path.id);
       return;
     }
-    if (url.match(/myanimelist\.net\/(anime|manga)\/\d*/i)) {
-      this.type = utils.urlPart(url, 3) === 'anime' ? 'anime' : 'manga';
-      this.ids.mal = Number(utils.urlPart(url, 4));
+    if (path?.provider === 'MAL') {
+      this.type = path.type;
+      this.ids.mal = Number(path.id);
       return;
     }
     throw new UrlNotSupportedError(url);
   }
 
   getCacheKey() {
-    return helper.getCacheKey(this.ids.mal, this.ids.ani);
+    return this.getKey(['ANILIST']);
   }
 
   getPageId() {
@@ -49,7 +53,34 @@ export class Single extends SingleAbstract {
   }
 
   _setStatus(status) {
+    if (status === definitions.status.Considering && !this.supportsConsidering()) {
+      status = definitions.status.PlanToWatch;
+    }
     this.animeInfo.mediaListEntry.status = helper.statusTranslate[status];
+  }
+
+  _getStartDate() {
+    return helper.parseFuzzyDate(this.animeInfo.mediaListEntry.startedAt);
+  }
+
+  _setStartDate(startDate) {
+    this.animeInfo.mediaListEntry.startedAt = helper.getFuzzyDate(startDate);
+  }
+
+  _getFinishDate() {
+    return helper.parseFuzzyDate(this.animeInfo.mediaListEntry.completedAt);
+  }
+
+  _setFinishDate(finishDate) {
+    this.animeInfo.mediaListEntry.completedAt = helper.getFuzzyDate(finishDate);
+  }
+
+  _getRewatchCount() {
+    return this.animeInfo.mediaListEntry.repeat;
+  }
+
+  _setRewatchCount(rewatchCount) {
+    this.animeInfo.mediaListEntry.repeat = rewatchCount;
   }
 
   _getScore() {
@@ -118,7 +149,7 @@ export class Single extends SingleAbstract {
   }
 
   _getImage() {
-    return this.animeInfo.coverImage.large;
+    return helper.imgCheck(this.animeInfo.coverImage.large);
   }
 
   _getRating() {
@@ -152,6 +183,16 @@ export class Single extends SingleAbstract {
         mediaListEntry {
           id
           status
+          startedAt {
+            year
+            month
+            day
+          }
+          completedAt {
+            year
+            month
+            day
+          }
           progress
           progressVolumes
           score(format: POINT_100)
@@ -197,6 +238,16 @@ export class Single extends SingleAbstract {
             repeat: 0,
             score: 0,
             status: 'PLANNING',
+            startedAt: {
+              year: null,
+              month: null,
+              day: null,
+            },
+            completedAt: {
+              year: null,
+              month: null,
+              day: null,
+            },
           };
         }
 
@@ -206,8 +257,8 @@ export class Single extends SingleAbstract {
 
   async _sync() {
     let query = `
-      mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $scoreRaw: Int, $notes: String) {
-        SaveMediaListEntry (mediaId: $mediaId, status: $status, progress: $progress, scoreRaw: $scoreRaw, notes: $notes) {
+      mutation ($mediaId: Int, $status: MediaListStatus, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput, $progress: Int, $scoreRaw: Int, $repeat: Int, $notes: String) {
+        SaveMediaListEntry (mediaId: $mediaId, status: $status, startedAt: $startedAt, completedAt: $completedAt, progress: $progress, scoreRaw: $scoreRaw, repeat: $repeat, notes: $notes) {
           id
           status
           progress
@@ -217,16 +268,19 @@ export class Single extends SingleAbstract {
     const variables = {
       mediaId: this.ids.ani,
       status: this.animeInfo.mediaListEntry.status,
+      startedAt: this.animeInfo.mediaListEntry.startedAt,
+      completedAt: this.animeInfo.mediaListEntry.completedAt,
       progress: this.animeInfo.mediaListEntry.progress,
       scoreRaw: this.animeInfo.mediaListEntry.score,
+      repeat: this.animeInfo.mediaListEntry.repeat,
       notes: this.animeInfo.mediaListEntry.notes,
       volumes: null,
     };
 
     if (this.type === 'manga') {
       query = `
-        mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $scoreRaw: Int, $notes: String, $volumes: Int) {
-          SaveMediaListEntry (mediaId: $mediaId, status: $status, progress: $progress, scoreRaw: $scoreRaw, notes: $notes, progressVolumes: $volumes) {
+        mutation ($mediaId: Int, $status: MediaListStatus, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput, $progress: Int, $scoreRaw: Int, $repeat: Int, $notes: String, $volumes: Int) {
+          SaveMediaListEntry (mediaId: $mediaId, status: $status, startedAt: $startedAt, completedAt: $completedAt, progress: $progress, scoreRaw: $scoreRaw, repeat: $repeat, notes: $notes, progressVolumes: $volumes) {
             id
             status
             progress

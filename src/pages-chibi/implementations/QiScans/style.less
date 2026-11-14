@@ -1,0 +1,23 @@
+@import './../pages';
+
+@boxBackground: var(--color-surface-2);
+@highlightStyle: 1;
+@activeEp: var(--color-accent);
+
+#malp {
+  margin-bottom: 24px;
+  #MalData {
+    .malp-group-field:hover,
+    .malp-group-field:focus,
+    .malp-group-value-section:focus-within,
+    .malp-group-value-section:hover {
+      background-color: var(--color-surface-3) !important;
+      transition-duration: 0.25s;
+      box-shadow: none;
+      option {
+        background-color: var(--color-surface-3) !important;
+        font-family: sans-serif;
+      }
+    }
+  }
+}

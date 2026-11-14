@@ -1,20 +1,23 @@
-import { MetaOverviewAbstract } from '../metaOverviewAbstract';
+import { MetaOverviewAbstract, Recommendation, Review } from '../metaOverviewAbstract';
 import { UrlNotSupportedError } from '../Errors';
+import { urlToSlug } from '../../utils/slugs';
 import * as helper from './helper';
+import { IntlDateTime, IntlDuration } from '../../utils/IntlWrapper';
 
 export class MetaOverview extends MetaOverviewAbstract {
   constructor(url) {
     super(url);
     this.logger = this.logger.m('Anilist');
-    if (url.match(/anilist\.co\/(anime|manga)\/\d*/i)) {
-      this.type = utils.urlPart(url, 3) === 'anime' ? 'anime' : 'manga';
-      this.aniId = Number(utils.urlPart(url, 4));
+    const { path } = urlToSlug(url);
+    if (path?.provider === 'ANILIST') {
+      this.type = path.type;
+      this.aniId = Number(path.id);
       this.malId = NaN;
       return this;
     }
-    if (url.match(/myanimelist\.net\/(anime|manga)\/\d*/i)) {
-      this.type = utils.urlPart(url, 3) === 'anime' ? 'anime' : 'manga';
-      this.malId = Number(utils.urlPart(url, 4));
+    if (path?.provider === 'MAL') {
+      this.type = path.type;
+      this.malId = Number(path.id);
       this.aniId = NaN;
       return this;
     }
@@ -28,7 +31,11 @@ export class MetaOverview extends MetaOverviewAbstract {
   private readonly malId: number;
 
   async _init() {
-    this.logger.log('Retrieve', this.type, this.aniId ? `Anilist: ${this.aniId}` : `MAL: ${this.malId}`);
+    this.logger.log(
+      'Retrieve',
+      this.type,
+      this.aniId ? `Anilist: ${this.aniId}` : `MAL: ${this.malId}`,
+    );
 
     const data = await this.getData();
     this.logger.log('Data', data);
@@ -41,6 +48,8 @@ export class MetaOverview extends MetaOverviewAbstract {
     this.statistics(data);
     this.info(data);
     this.related(data);
+    this.reviews(data);
+    this.recommendations(data);
 
     this.logger.log('Res', this.meta);
   }
@@ -67,14 +76,16 @@ export class MetaOverview extends MetaOverviewAbstract {
         description(asHtml: true)
         coverImage{
           large
+          extraLarge
         }
+        bannerImage
         title {
           userPreferred
           romaji
           english
           native
         }
-        characters (perPage: 6, sort: [ROLE, ID]) {
+        characters (perPage: 8, sort: [ROLE, ID]) {
             edges {
                 id
                 role
@@ -142,6 +153,54 @@ export class MetaOverview extends MetaOverviewAbstract {
                 }
             }
         }
+        reviews {
+            nodes {
+                rating
+                createdAt
+                score
+                body(asHtml: true)
+                user {
+                    name
+                    siteUrl
+                    avatar {
+                      medium
+                    }
+                }
+
+            }
+        }
+        recommendations (sort: [RATING_DESC]) {
+            nodes {
+                rating
+                mediaRecommendation {
+                    title {
+                        userPreferred
+                    }
+                    siteUrl
+                    coverImage {
+                        large
+                    }
+                }
+            }
+        }
+        ${
+          this.type === 'manga'
+            ? `
+        staff {
+            edges {
+                id
+                role
+                node {
+                    siteUrl
+                    name {
+                        userPreferred
+                    }
+                }
+            }
+        }
+          `
+            : ''
+        }
         source(version: 2)
         genres
         externalLinks {
@@ -156,7 +215,7 @@ export class MetaOverview extends MetaOverviewAbstract {
       type: this.type.toUpperCase(),
     };
 
-    return this.apiCall(query, variables, false);
+    return this.apiCall(query, variables);
   }
 
   private title(data) {
@@ -170,8 +229,10 @@ export class MetaOverview extends MetaOverviewAbstract {
   }
 
   private image(data) {
-    const image = data?.data?.Media?.coverImage?.large;
+    const image = helper.imgCheck(data?.data?.Media?.coverImage?.large);
     if (image) this.meta.image = image;
+    this.meta.imageLarge = helper.imgCheck(data?.data?.Media?.coverImage?.extraLarge) || image;
+    this.meta.imageBanner = helper.imgCheck(data?.data?.Media?.bannerImage);
   }
 
   private alternativeTitle(data) {
@@ -179,7 +240,7 @@ export class MetaOverview extends MetaOverviewAbstract {
     if (titles) {
       for (const prop in titles) {
         const el = data.data.Media.title[prop];
-        if (el !== this.meta.title && el) {
+        if (el) {
           this.meta.alternativeTitle.push(el);
         }
       }
@@ -191,14 +252,19 @@ export class MetaOverview extends MetaOverviewAbstract {
     if (chars) {
       chars.forEach(i => {
         let name = '';
+        let role = '';
         if (i.node.name.last) name += i.node.name.last;
         if (i.node.name.first && i.node.name.last) {
           name += ', ';
         }
         if (i.node.name.first) name += i.node.name.first;
+        if (i.role) {
+          role = i.role.charAt(0).toUpperCase() + i.role.slice(1).toLowerCase();
+        }
         this.meta.characters.push({
-          img: i.node.image.large,
+          img: helper.imgCheck(i.node.image.large),
           name,
+          subtext: role,
           url: i.node.siteUrl,
         });
       });
@@ -208,19 +274,19 @@ export class MetaOverview extends MetaOverviewAbstract {
   private statistics(data) {
     if (data.data.Media.averageScore)
       this.meta.statistics.push({
-        title: 'Score:',
+        title: api.storage.lang('overview_sidebar_Score'),
         body: data.data.Media.averageScore,
       });
 
     if (data.data.Media.favourites)
       this.meta.statistics.push({
-        title: 'Favourites:',
+        title: api.storage.lang('overview_sidebar_Favorites'),
         body: data.data.Media.favourites,
       });
 
     if (data.data.Media.popularity)
       this.meta.statistics.push({
-        title: 'Popularity:',
+        title: api.storage.lang('overview_sidebar_Popularity'),
         body: data.data.Media.popularity,
       });
 
@@ -228,6 +294,8 @@ export class MetaOverview extends MetaOverviewAbstract {
       if (this.meta.statistics.length < 4 && i.allTime) {
         let title = `${i.context.replace('all time', '').trim()}:`;
         title = title.charAt(0).toUpperCase() + title.slice(1);
+
+        if (title === 'Highest rated:') title = api.storage.lang('overview_sidebar_Ranked');
 
         this.meta.statistics.push({
           title,
@@ -242,47 +310,65 @@ export class MetaOverview extends MetaOverviewAbstract {
       let format = data.data.Media.format.toLowerCase().replace('_', ' ');
       format = format.charAt(0).toUpperCase() + format.slice(1);
       this.meta.info.push({
-        title: 'Format:',
+        title: api.storage.lang('overview_sidebar_Format'),
         body: [{ text: format }],
       });
     }
 
     if (data.data.Media.episodes)
       this.meta.info.push({
-        title: 'Episodes:',
+        title: api.storage.lang('overview_sidebar_Episodes'),
         body: [{ text: data.data.Media.episodes }],
       });
 
     if (data.data.Media.duration)
       this.meta.info.push({
-        title: 'Episode Duration:',
-        body: [{ text: `${data.data.Media.duration} mins` }],
+        title: api.storage.lang('overview_sidebar_Duration'),
+        body: [
+          {
+            text: `${new IntlDuration().setRelativeTime(data.data.Media.duration, 'minutes', 'Duration').getRelativeText()}`,
+          },
+        ],
       });
 
     if (data.data.Media.status) {
       let status = data.data.Media.status.toLowerCase().replace('_', ' ');
       status = status.charAt(0).toUpperCase() + status.slice(1);
       this.meta.info.push({
-        title: 'Status:',
+        title: api.storage.lang('overview_sidebar_Status'),
         body: [{ text: status }],
       });
     }
 
     if (data.data.Media.startDate.year)
       this.meta.info.push({
-        title: 'Start Date:',
+        title: api.storage.lang('overview_sidebar_Start_Date'),
         body: [
           {
-            text: `${data.data.Media.startDate.year}-${data.data.Media.startDate.month}-${data.data.Media.startDate.day}`,
+            text: new IntlDateTime(
+              new Date(
+                data.data.Media.startDate.year,
+                data.data.Media.startDate.month,
+                data.data.Media.startDate.day,
+              ),
+            ).getDateTimeText(),
           },
         ],
       });
 
     if (data.data.Media.endDate.year)
       this.meta.info.push({
-        title: 'End Date:',
+        title: api.storage.lang('overview_sidebar_End_Date'),
         body: [
-          { text: `${data.data.Media.endDate.year}-${data.data.Media.endDate.month}-${data.data.Media.endDate.day}` },
+          {
+            text: new IntlDateTime(
+              new Date(
+                data.data.Media.endDate.year,
+                data.data.Media.endDate.month,
+                data.data.Media.endDate.day,
+              ),
+            ).getDateTimeText(),
+          },
         ],
       });
 
@@ -291,13 +377,13 @@ export class MetaOverview extends MetaOverviewAbstract {
       season = season.charAt(0).toUpperCase() + season.slice(1);
       if (data.data.Media.endDate.year) season += ` ${data.data.Media.endDate.year}`;
       this.meta.info.push({
-        title: 'Season:',
+        title: api.storage.lang('overview_sidebar_Season'),
         body: [{ text: season }],
       });
     }
 
     const studios: any = [];
-    data.data.Media.studios.edges.forEach(function(i, index) {
+    data.data.Media.studios.edges.forEach(function (i, index) {
       if (i.isMain) {
         studios.push({
           text: i.node.name,
@@ -307,35 +393,59 @@ export class MetaOverview extends MetaOverviewAbstract {
     });
     if (studios.length)
       this.meta.info.push({
-        title: 'Studios:',
+        title: api.storage.lang('overview_sidebar_Studios'),
         body: studios,
       });
+
+    if (data.data.Media.staff && data.data.Media.staff.edges.length) {
+      const authors: any[] = [];
+      data.data.Media.staff.edges
+        .filter(author => {
+          return !['Editing', 'Translator', 'Lettering', 'Touch-up'].find(ignore =>
+            author.role.toLowerCase().includes(ignore.toLowerCase()),
+          );
+        })
+        .forEach(author => {
+          const role = author.role.replace(/(original|design|\([^)]*\))/gi, '').trim();
+
+          authors.push({
+            text: author.node.name.userPreferred,
+            url: author.node.siteUrl,
+            subtext: role || '',
+          });
+        });
+      if (authors.length)
+        this.meta.info.push({
+          title: api.storage.lang('overview_sidebar_Authors'),
+          body: authors,
+        });
+    }
 
     if (data.data.Media.source) {
       let source = data.data.Media.source.toLowerCase().replace('_', ' ');
       source = source.charAt(0).toUpperCase() + source.slice(1);
       this.meta.info.push({
-        title: 'Source:',
+        title: api.storage.lang('overview_sidebar_Source'),
         body: [{ text: source }],
       });
     }
 
     if (data.data.Media.genres) {
       const gen: any[] = [];
-      data.data.Media.genres.forEach(function(i, index) {
+      data.data.Media.genres.forEach(function (i, index) {
         gen.push({
           text: i,
           url: `https://anilist.co/search/anime?includedGenres=${i}`,
         });
       });
       this.meta.info.push({
-        title: 'Genres:',
+        title: api.storage.lang('overview_sidebar_Genres'),
         body: gen,
       });
     }
 
     const external: any[] = [];
-    data.data.Media.externalLinks.forEach(function(i, index) {
+    data.data.Media.externalLinks.forEach(function (i, index) {
       external.push({
         text: i.site,
         url: i.url,
@@ -343,7 +453,7 @@ export class MetaOverview extends MetaOverviewAbstract {
     });
     if (external.length)
       this.meta.info.push({
-        title: 'External Links:',
+        title: api.storage.lang('overview_sidebar_external_links'),
         body: external,
       });
   }
@@ -365,10 +475,47 @@ export class MetaOverview extends MetaOverviewAbstract {
         title: i.node.title.userPreferred,
         id: i.node.id,
         type: i.node.type.toLowerCase(),
-        statusTag: '',
       });
     });
     this.meta.related = Object.keys(links).map(key => links[key]);
+  }
+
+  private reviews(data) {
+    const reviews: Review[] = [];
+    data.data.Media.reviews.nodes.forEach(i => {
+      reviews.push({
+        body: {
+          people: i.rating,
+          date: new IntlDateTime(i.createdAt * 1000).getDateTimeText({ dateStyle: 'medium' }),
+          rating: i.score,
+          text: i.body,
+        },
+        user: {
+          name: i.user.name,
+          image: i.user.avatar.medium,
+          href: i.user.siteUrl,
+        },
+      });
+    });
+    this.meta.reviews = reviews;
+  }
+
+  private recommendations(data) {
+    const recommendations: Recommendation[] = [];
+    data.data.Media.recommendations.nodes.forEach(i => {
+      if (!i.mediaRecommendation) return;
+      recommendations.push({
+        entry: {
+          title: i.mediaRecommendation.title.userPreferred,
+          url: i.mediaRecommendation.siteUrl,
+          image: i.mediaRecommendation.coverImage.large,
+        },
+        stats: {
+          users: i.rating,
+        },
+      });
+    });
+    this.meta.recommendations = recommendations;
   }
 
   protected apiCall = helper.apiCall;

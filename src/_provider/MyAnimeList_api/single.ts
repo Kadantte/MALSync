@@ -1,9 +1,10 @@
 import { SingleAbstract } from '../singleAbstract';
-import { NotAutenticatedError, UrlNotSupportedError } from '../Errors';
+import { urlToSlug } from '../../utils/slugs';
+import { NotAutenticatedError, NotFoundError, UrlNotSupportedError } from '../Errors';
 import * as helper from './helper';
+import * as definitions from '../definitions';
 import { malToAnilist } from '../AniList/helper';
 import { Cache } from '../../utils/Cache';
-import { returnYYYYMMDD } from '../../utils/general';
 
 export class Single extends SingleAbstract {
   constructor(protected url: string) {
@@ -23,9 +24,10 @@ export class Single extends SingleAbstract {
   authenticationUrl = helper.authenticationUrl;
 
   protected handleUrl(url) {
-    if (url.match(/myanimelist\.net\/(anime|manga)\/\d*/i)) {
-      this.type = utils.urlPart(url, 3) === 'anime' ? 'anime' : 'manga';
-      this.ids.mal = Number(utils.urlPart(url, 4));
+    const { path } = urlToSlug(url);
+    if (path?.provider === 'MAL') {
+      this.type = path.type;
+      this.ids.mal = Number(path.id);
       return;
     }
     throw new UrlNotSupportedError(url);
@@ -46,22 +48,66 @@ export class Single extends SingleAbstract {
     } else {
       curSt = parseInt(helper.animeStatus[this.animeInfo.my_list_status.status]);
     }
-    if (this.getRewatching() && curSt === 2) return 23;
+    if (this.getRewatching() && curSt === definitions.status.Completed) {
+      return definitions.status.Rewatching;
+    }
     return curSt;
   }
 
   _setStatus(status) {
-    if (status === 23) {
-      status = 2;
+    if (status === definitions.status.Rewatching) {
+      status = definitions.status.Completed;
       this.setRewatching(true);
     } else {
       this.setRewatching(false);
+    }
+    if (status === definitions.status.Considering && !this.supportsConsidering()) {
+      status = definitions.status.PlanToWatch;
     }
     if (this.type === 'manga') {
       this.animeInfo.my_list_status.status = helper.mangaStatus[status];
       return;
     }
     this.animeInfo.my_list_status.status = helper.animeStatus[status];
+  }
+
+  increaseRewatchCount(): void {
+    if (this.type === 'manga') {
+      this.animeInfo.my_list_status.num_times_reread++;
+    } else {
+      this.animeInfo.my_list_status.num_times_rewatched++;
+    }
+  }
+
+  _getStartDate() {
+    return helper.getRoundedDate(this.animeInfo.my_list_status.start_date);
+  }
+
+  _setStartDate(startDate) {
+    this.animeInfo.my_list_status.start_date = startDate;
+  }
+
+  _getFinishDate() {
+    return helper.getRoundedDate(this.animeInfo.my_list_status.finish_date);
+  }
+
+  _setFinishDate(finishDate) {
+    this.animeInfo.my_list_status.finish_date = finishDate;
+  }
+
+  _getRewatchCount() {
+    if (this.type === 'manga') {
+      return this.animeInfo.my_list_status.num_times_reread;
+    }
+    return this.animeInfo.my_list_status.num_times_rewatched;
+  }
+
+  _setRewatchCount(rewatchCount) {
+    if (this.type === 'manga') {
+      this.animeInfo.my_list_status.num_times_reread = rewatchCount;
+    } else {
+      this.animeInfo.my_list_status.num_times_rewatched = rewatchCount;
+    }
   }
 
   _getScore() {
@@ -183,7 +229,7 @@ export class Single extends SingleAbstract {
       type: 'GET',
       path: `${this.type}/${this.ids.mal}`,
       fields: [
-        'my_list_status{tags,is_rewatching,is_rereading,start_date,finish_date}',
+        'my_list_status{tags,is_rewatching,is_rereading,num_times_rewatched,num_times_reread,start_date,finish_date}',
         'num_episodes',
         'mean',
         // Manga
@@ -194,6 +240,8 @@ export class Single extends SingleAbstract {
       .catch(e => {
         if (e instanceof NotAutenticatedError) {
           this._authenticated = false;
+        } else if (e instanceof NotFoundError) {
+          this._authenticated = true;
         }
         throw e;
       })
@@ -209,6 +257,7 @@ export class Single extends SingleAbstract {
               is_rereading: false,
               num_chapters_read: 0,
               num_volumes_read: 0,
+              num_times_reread: 0,
               score: 0,
               status: 'plan_to_read',
               tags: [],
@@ -217,6 +266,7 @@ export class Single extends SingleAbstract {
             this.animeInfo.my_list_status = {
               is_rewatching: false,
               num_watched_episodes: 0,
+              num_times_rewatched: 0,
               score: 0,
               status: 'plan_to_watch',
               tags: [],
@@ -229,29 +279,14 @@ export class Single extends SingleAbstract {
           this.animeInfo.my_list_status &&
           typeof this.animeInfo.my_list_status.num_episodes_watched !== 'undefined'
         ) {
-          this.animeInfo.my_list_status.num_watched_episodes = this.animeInfo.my_list_status.num_episodes_watched;
+          this.animeInfo.my_list_status.num_watched_episodes =
+            this.animeInfo.my_list_status.num_episodes_watched;
           delete this.animeInfo.my_list_status.num_episodes_watched;
         }
       });
   }
 
   async _sync() {
-    if (
-      typeof this.animeInfo.my_list_status.start_date === 'undefined' &&
-      this._getStatus() === 1 &&
-      this._getEpisode() > 0
-    ) {
-      this.animeInfo.my_list_status.start_date = returnYYYYMMDD();
-    }
-
-    if (typeof this.animeInfo.my_list_status.finish_date === 'undefined' && this._getStatus() === 2) {
-      this.animeInfo.my_list_status.finish_date = returnYYYYMMDD();
-
-      if (typeof this.animeInfo.my_list_status.start_date === 'undefined') {
-        this.animeInfo.my_list_status.start_date = returnYYYYMMDD();
-      }
-    }
-
     const sentData = {};
     for (const property in this.animeInfo.my_list_status) {
       switch (property) {
@@ -269,9 +304,11 @@ export class Single extends SingleAbstract {
         case 'tags':
         case 'comments':
         case 'status':
+          sentData[property] = this.animeInfo.my_list_status[property];
+          break;
         case 'start_date':
         case 'finish_date':
-          sentData[property] = this.animeInfo.my_list_status[property];
+          sentData[property] = this.animeInfo.my_list_status[property] ?? '';
           break;
         default:
       }
@@ -294,7 +331,10 @@ export class Single extends SingleAbstract {
   }
 
   public async fillRelations(): Promise<void> {
-    const cacheObj = new Cache(`fillRelations/${this.ids.mal}/${this.getType()}`, 7 * 24 * 60 * 60 * 1000);
+    const cacheObj = new Cache(
+      `fillRelations/${this.ids.mal}/${this.getType()}`,
+      7 * 24 * 60 * 60 * 1000,
+    );
 
     return cacheObj.hasValueAndIsNotEmpty().then(exists => {
       if (!exists) {

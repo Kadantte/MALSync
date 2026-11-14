@@ -1,5 +1,7 @@
 import { SingleAbstract } from '../singleAbstract';
+import { buildProviderUrl, urlToSlug } from '../../utils/slugs';
 import * as helper from './helper';
+import * as definitions from '../definitions';
 import { NotAutenticatedError, NotFoundError, UrlNotSupportedError } from '../Errors';
 import { point10 } from '../ScoreMode/point10';
 import { point20decimal } from '../ScoreMode/point20decimal';
@@ -25,24 +27,25 @@ export class Single extends SingleAbstract {
 
   shortName = 'Kitsu';
 
-  authenticationUrl = 'https://kitsu.io/404?mal-sync=authentication';
+  authenticationUrl = 'https://kitsu.app/404?mal-sync=authentication';
 
   protected handleUrl(url) {
-    if (url.match(/kitsu\.io\/(anime|manga)\/.*/i)) {
-      this.type = utils.urlPart(url, 3) === 'anime' ? 'anime' : 'manga';
-      this.ids.kitsu.slug = utils.urlPart(url, 4);
+    const { path } = urlToSlug(url);
+    if (path?.provider === 'KITSU') {
+      this.type = path.type;
+      this.ids.kitsu.slug = path.id;
       return;
     }
-    if (url.match(/myanimelist\.net\/(anime|manga)\/\d*/i)) {
-      this.type = utils.urlPart(url, 3) === 'anime' ? 'anime' : 'manga';
-      this.ids.mal = Number(utils.urlPart(url, 4));
+    if (path?.provider === 'MAL') {
+      this.type = path.type;
+      this.ids.mal = Number(path.id);
       return;
     }
     throw new UrlNotSupportedError(url);
   }
 
   getCacheKey() {
-    return helper.getCacheKey(this.ids.mal, this.ids.kitsu.id);
+    return this.getKey(['KITSU']);
   }
 
   getPageId() {
@@ -50,18 +53,46 @@ export class Single extends SingleAbstract {
   }
 
   _getStatus() {
-    if (this.listI().attributes.reconsuming && this.listI().attributes.status === 'current') return 23;
+    if (this.listI().attributes.reconsuming && this.listI().attributes.status === 'current')
+      return definitions.status.Rewatching;
     return parseInt(helper.translateList(this.listI().attributes.status));
   }
 
   _setStatus(status) {
-    if (status === 23) {
-      status = 1;
+    if (status === definitions.status.Rewatching) {
+      status = definitions.status.Watching;
       this.listI().attributes.reconsuming = true;
     } else {
       this.listI().attributes.reconsuming = false;
     }
+    if (status === definitions.status.Considering && !this.supportsConsidering()) {
+      status = definitions.status.PlanToWatch;
+    }
     this.listI().attributes.status = helper.translateList(status, parseInt(status.toString()));
+  }
+
+  _getStartDate() {
+    return helper.timestampToDate(this.listI().attributes.startedAt);
+  }
+
+  _setStartDate(startDate) {
+    this.listI().attributes.startedAt = helper.dateToTimestamp(startDate);
+  }
+
+  _getFinishDate() {
+    return helper.timestampToDate(this.listI().attributes.finishedAt);
+  }
+
+  _setFinishDate(finishDate) {
+    this.listI().attributes.finishedAt = helper.dateToTimestamp(finishDate);
+  }
+
+  _getRewatchCount() {
+    return this.listI().attributes.reconsumeCount;
+  }
+
+  _setRewatchCount(rewatchCount) {
+    this.listI().attributes.reconsumeCount = rewatchCount;
   }
 
   _getScore() {
@@ -122,7 +153,10 @@ export class Single extends SingleAbstract {
 
   _getTitle() {
     try {
-      return helper.getTitle(this.animeI().attributes.titles, this.animeI().attributes.canonicalTitle);
+      return helper.getTitle(
+        this.animeI().attributes.titles,
+        this.animeI().attributes.canonicalTitle,
+      );
     } catch (e) {
       console.error('title', e);
       return 'Failed';
@@ -144,7 +178,7 @@ export class Single extends SingleAbstract {
   }
 
   _getDisplayUrl() {
-    return `https://kitsu.io/${this.getType()}/${this.animeI().attributes.slug}`;
+    return buildProviderUrl('KITSU', this.getType()!, this.animeI().attributes.slug);
   }
 
   _getImage() {
@@ -163,8 +197,8 @@ export class Single extends SingleAbstract {
       /* eslint-disable-next-line no-var */
       var kitsuSlugRes = await this.kitsuSlugtoKitsu(this.ids.kitsu.slug, this.getType());
       try {
-        this.ids.kitsu.id = kitsuSlugRes.res.data[0].id;
-        this.ids.mal = kitsuSlugRes.malId;
+        this.ids.kitsu.id = Number(kitsuSlugRes.res.data[0].id);
+        this.ids.mal = Number(kitsuSlugRes.malId);
       } catch (e) {
         this._authenticated = true;
         throw new NotFoundError('Not found');
@@ -174,10 +208,14 @@ export class Single extends SingleAbstract {
       /* eslint-disable-next-line no-var */
       var kitsuRes = await this.malToKitsu(this.ids.mal, this.getType());
       try {
-        this.ids.kitsu.id = kitsuRes.data[0].relationships.item.data.id;
+        const relation = kitsuRes.data.find(
+          item => item.relationships.item.data.type === this.getType(),
+        );
+        if (!relation) throw new NotFoundError('Not found');
+        this.ids.kitsu.id = Number(relation.relationships.item.data.id);
       } catch (e) {
         this._authenticated = true;
-        throw new NotFoundError('Not found');
+        throw new NotFoundError(`No entry found for malId ${this.ids.mal}`);
       }
     }
 
@@ -186,7 +224,7 @@ export class Single extends SingleAbstract {
       .then(userId => {
         return this.apiCall(
           'GET',
-          `https://kitsu.io/api/edge/library-entries?filter[user_id]=${userId}&filter[kind]=${this.getType()}&filter[${this.getType()}_id]=${
+          `https://kitsu.app/api/edge/library-entries?filter[user_id]=${userId}&filter[kind]=${this.getType()}&filter[${this.getType()}_id]=${
             this.ids.kitsu.id
           }&page[limit]=1&page[limit]=1&include=${this.getType()}&fields[${this.getType()}]=slug,titles,canonicalTitle,averageRating,posterImage,${
             this.getType() === 'anime' ? 'episodeCount' : 'chapterCount,volumeCount'
@@ -213,9 +251,11 @@ export class Single extends SingleAbstract {
               progress: 0,
               volumesOwned: 0,
               reconsuming: false,
-              reconsumeCount: false,
+              reconsumeCount: 0,
               ratingTwenty: null,
               status: 'planned',
+              startedAt: null,
+              finishedAt: null,
             },
           };
           if (typeof kitsuRes !== 'undefined') {
@@ -231,7 +271,9 @@ export class Single extends SingleAbstract {
         if (tempAnimeInfo.data[0].attributes.ratingHundred) {
           tempAnimeInfo.data[0].attributes.ratingHundred = 0;
         } else {
-          tempAnimeInfo.data[0].attributes.ratingHundred = Number(tempAnimeInfo.data[0].attributes.ratingTwenty * 5);
+          tempAnimeInfo.data[0].attributes.ratingHundred = Number(
+            tempAnimeInfo.data[0].attributes.ratingTwenty * 5,
+          );
         }
 
         this.animeInfo = tempAnimeInfo;
@@ -258,6 +300,8 @@ export class Single extends SingleAbstract {
           reconsumeCount: this.listI().attributes.reconsumeCount,
           ratingTwenty: this._getTwentyScore(),
           status: this.listI().attributes.status,
+          startedAt: this.listI().attributes.startedAt,
+          finishedAt: this.listI().attributes.finishedAt,
         },
         type: 'library-entries',
       },
@@ -267,11 +311,11 @@ export class Single extends SingleAbstract {
     let updateUrl;
     let post;
     if (this.isOnList()) {
-      updateUrl = `https://kitsu.io/api/edge/library-entries/${this.listI().id}`;
+      updateUrl = `https://kitsu.app/api/edge/library-entries/${this.listI().id}`;
       variables.data.id = this.listI().id;
       post = 'PATCH';
     } else {
-      updateUrl = 'https://kitsu.io/api/edge/library-entries/';
+      updateUrl = 'https://kitsu.app/api/edge/library-entries/';
       variables.data.relationships = {
         [tType]: {
           data: {
@@ -299,7 +343,12 @@ export class Single extends SingleAbstract {
     });
   }
 
-  protected apiCall(mode, url, variables = {}, authentication = true) {
+  protected apiCall(
+    mode: 'GET' | 'POST' | 'DELETE' | 'PUT',
+    url,
+    variables = {},
+    authentication = true,
+  ) {
     return helper.apiCall(mode, url, variables, authentication).catch(e => {
       if (e instanceof NotAutenticatedError) throw new NotAutenticatedError(e.message);
       throw e;
@@ -308,16 +357,16 @@ export class Single extends SingleAbstract {
 
   protected kitsuSlugtoKitsu(kitsuSlug: string, type: any) {
     return this.apiCall(
-      'Get',
-      `https://kitsu.io/api/edge/${type}?filter[slug]=${kitsuSlug}&page[limit]=1&include=mappings`,
+      'GET',
+      `https://kitsu.app/api/edge/${type}?filter[slug]=${kitsuSlug}&page[limit]=1&include=mappings`,
       {},
     )
       .catch(e => {
         if (e instanceof NotAutenticatedError) {
           this._authenticated = false;
           return this.apiCall(
-            'Get',
-            `https://kitsu.io/api/edge/${type}?filter[slug]=${kitsuSlug}&page[limit]=1&include=mappings`,
+            'GET',
+            `https://kitsu.app/api/edge/${type}?filter[slug]=${kitsuSlug}&page[limit]=1&include=mappings`,
             {},
             false,
           );
@@ -331,11 +380,11 @@ export class Single extends SingleAbstract {
             const mapping = res.included[k];
             if (mapping.type === 'mappings') {
               if (mapping.attributes.externalSite === `myanimelist/${type}`) {
-                malId = mapping.attributes.externalId;
+                malId = Number(mapping.attributes.externalId);
                 res.included.splice(k, 1);
                 break;
               } else if (mapping.attributes.externalSite === `anilist/${type}`) {
-                this.ids.ani = mapping.attributes.externalId;
+                this.ids.ani = Number(mapping.attributes.externalId);
               }
             }
           }
@@ -346,16 +395,16 @@ export class Single extends SingleAbstract {
 
   protected malToKitsu(malid: number, type: any) {
     return this.apiCall(
-      'Get',
-      `https://kitsu.io/api/edge/mappings?filter[externalSite]=myanimelist/${type}&filter[externalId]=${malid}&include=item&fields[item]=id`,
+      'GET',
+      `https://kitsu.app/api/edge/mappings?filter[externalSite]=myanimelist/${type}&filter[externalId]=${malid}&include=item&fields[item]=id`,
       {},
     )
       .catch(e => {
         if (e instanceof NotAutenticatedError) {
           this._authenticated = false;
           return this.apiCall(
-            'Get',
-            `https://kitsu.io/api/edge/mappings?filter[externalSite]=myanimelist/${type}&filter[externalId]=${malid}&include=item&fields[item]=id`,
+            'GET',
+            `https://kitsu.app/api/edge/mappings?filter[externalSite]=myanimelist/${type}&filter[externalId]=${malid}&include=item&fields[item]=id`,
             {},
             false,
           );
@@ -372,8 +421,12 @@ export class Single extends SingleAbstract {
     if (typeof userId !== 'undefined' && userId) {
       return userId;
     }
-    return this.apiCall('Get', 'https://kitsu.io/api/edge/users?filter[self]=true').then(res => {
-      if (typeof res.data === 'undefined' || !res.data.length || typeof res.data[0] === 'undefined') {
+    return this.apiCall('GET', 'https://kitsu.app/api/edge/users?filter[self]=true').then(res => {
+      if (
+        typeof res.data === 'undefined' ||
+        !res.data.length ||
+        typeof res.data[0] === 'undefined'
+      ) {
         throw new NotAutenticatedError('Not Authenticated');
       }
       api.storage.set('kitsuUserId', res.data[0].id);
@@ -395,6 +448,6 @@ export class Single extends SingleAbstract {
   }
 
   _delete() {
-    return this.apiCall('DELETE', `https://kitsu.io/api/edge/library-entries/${this.listI().id}`);
+    return this.apiCall('DELETE', `https://kitsu.app/api/edge/library-entries/${this.listI().id}`);
   }
 }

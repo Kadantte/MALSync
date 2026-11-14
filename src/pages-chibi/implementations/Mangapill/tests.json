@@ -1,0 +1,60 @@
+{
+    "title": "Mangapill",
+    "url": "https://mangapill.com",
+    "testCases": [
+      {
+        "url": "https://mangapill.com/chapters/5343-10210000/mokushiroku-no-yonkishi-chapter-210",
+        "expected": {
+          "nextEpUrl": "https://mangapill.com/chapters/5343-10211000/mokushiroku-no-yonkishi-chapter-211",
+          "sync": true,
+          "title": "Mokushiroku no Yonkishi",
+          "identifier": "mokushiroku-no-yonkishi",
+          "image": "https://cdn.readdetectiveconan.com/file/mangapill/i/5343.webp?h=019fad52-cf23-7c07-940a-6695551488e0",
+          "overviewUrl": "https://mangapill.com/manga/5343",
+          "episode": 210,
+          "uiSelector": false
+        }
+      },
+      {
+        "url": "https://mangapill.com/chapters/7529-10133000/kagurabachi-chapter-133",
+        "expected": {
+          "sync": true,
+          "title": "Kagurabachi",
+          "identifier": "kagurabachi",
+          "image": "https://cdn.readdetectiveconan.com/file/mangapill/i/7529.jpeg",
+          "overviewUrl": "https://mangapill.com/manga/7529",
+          "episode": 133,
+          "nextEpUrl": "https://mangapill.com/chapters/7529-10134000/kagurabachi-chapter-134",
+          "uiSelector": false
+        }
+      },
+      {
+        "url": "https://mangapill.com/manga/9280/tada-no-murabito-no-boku-ga-sanbyakunenmae-no-boukun-ouji-ni-tensei-shite-shimaimashita-zensei-no-chishiki-de-ansatsu-flag-wo-kaihi-shite-odayaka-ni-ikinokorimasu",
+        "expected": {
+          "sync": false,
+          "title": "Tada no Murabito no Boku ga, Sanbyakunenmae no Boukun Ouji ni Tensei shite Shimaimashita: Zensei no Chishiki de Ansatsu Flag wo Kaihi shite, Odayaka ni Ikinokorimasu!",
+          "identifier": "tada-no-murabito-no-boku-ga-sanbyakunenmae-no-boukun-ouji-ni-tensei-shite-shimaimashita-zensei-no-chishiki-de-ansatsu-flag-wo-kaihi-shite-odayaka-ni-ikinokorimasu",
+          "image": "https://cdn.readdetectiveconan.com/file/mangapill/i/9280.jpeg?h=0199dd6d-9cd3-7208-9727-4093285c7fc9",
+          "uiSelector": true,
+          "epList": {
+            "1" : "https://mangapill.com/chapters/9280-10001000/tada-no-murabito-no-boku-ga-sanbyakunenmae-no-boukun-ouji-ni-tensei-shite-shimaimashita-zensei-no-chishiki-de-ansatsu-flag-wo-kaihi-shite-odayaka-ni-ikinokorimasu-chapter-1",
+            "10": "https://mangapill.com/chapters/9280-10010100/tada-no-murabito-no-boku-ga-sanbyakunenmae-no-boukun-ouji-ni-tensei-shite-shimaimashita-zensei-no-chishiki-de-ansatsu-flag-wo-kaihi-shite-odayaka-ni-ikinokorimasu-chapter-10.1"
+         }
+        }
+      },
+      {
+        "url": "https://mangapill.com/manga/7529/kagurabachi",
+        "expected": {
+          "sync": false,
+          "title": "Kagurabachi",
+          "identifier": "kagurabachi",
+          "image": "https://cdn.readdetectiveconan.com/file/mangapill/i/7529.jpeg",
+          "uiSelector": true,
+          "epList": {
+            "1" : "https://mangapill.com/chapters/7529-10001000/kagurabachi-chapter-1",
+            "10": "https://mangapill.com/chapters/7529-10010000/kagurabachi-chapter-10"
+         }
+        }
+      }
+    ]
+  }

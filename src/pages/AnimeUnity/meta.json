@@ -1,5 +1,12 @@
 {
   "urls": {
-    "match": ["*://animeunity.it/anime/*", "*://animeunity.tv/anime/*"]
+    "match": [
+      "*://*.animeunity.it/anime/*",
+      "*://*.animeunity.tv/anime/*",
+      "*://*.animeunity.cc/anime/*",
+      "*://*.animeunity.to/anime/*",
+      "*://*.animeunity.so/anime/*",
+      "*://*.animeunity.co/anime/*"
+    ]
   }
 }

@@ -1,13 +1,14 @@
 import { ListAbstract, listElement } from '../listAbstract';
+import { buildProviderUrl } from '../../utils/slugs';
 
 export class UserList extends ListAbstract {
   name = 'MyAnimeList';
 
   authenticationUrl = 'https://myanimelist.net/login.php';
 
-  async getUsername() {
+  async getUserObject() {
     throw 'no';
-    return Promise.resolve('');
+    return Promise.resolve({ username: '', picture: '', href: '' });
     /*
     const url = 'https://myanimelist.net/panel.php?go=export&hideLayout';
     const response = await api.request.xhr('GET', url);
@@ -27,18 +28,18 @@ export class UserList extends ListAbstract {
       {
         icon: 'sort_by_alpha',
         title: 'Alphabetic',
-        value: 'alpha',
+        value: api.storage.lang('list_sorting_alpha'),
         asc: true,
       },
       {
         icon: 'history',
-        title: 'Last Updated',
+        title: api.storage.lang('list_sorting_history'),
         value: 'updated',
         asc: true,
       },
       {
         icon: 'score',
-        title: 'Score',
+        title: api.storage.lang('list_sorting_score'),
         value: 'score',
         asc: true,
       },
@@ -112,7 +113,7 @@ export class UserList extends ListAbstract {
             cacheKey: el.anime_id,
             type: this.listType,
             title: el.anime_title,
-            url: `https://myanimelist.net${el.anime_url}`,
+            url: buildProviderUrl('MAL', 'anime', el.anime_id),
             watchedEp: el.num_watched_episodes,
             totalEp: el.anime_num_episodes,
             status: el.status,
@@ -131,7 +132,7 @@ export class UserList extends ListAbstract {
             cacheKey: el.manga_id,
             type: this.listType,
             title: el.manga_title,
-            url: `https://myanimelist.net${el.manga_url}`,
+            url: buildProviderUrl('MAL', 'manga', el.manga_id),
             watchedEp: el.num_read_chapters,
             totalEp: el.manga_num_chapters,
             status: el.status,

@@ -1,13 +1,49 @@
-import { pages as part1 } from '../src/pages/pages';
-import { pages as part2 } from '../src/pages-adult/pages';
+import { pages } from '../src/pages/pages';
+import { getPageConfig } from '../src/utils/test';
+import { xhrAction } from '../src/background/messageHandler';
+import { Chibi } from '../src/pages-chibi/ChibiProxy';
+import { NotFoundError } from '../src/_provider/Errors';
+import chibiList from '../src/pages-chibi/builder/chibiList';
+import chibiPages from '../src/pages-chibi/builder/chibiPages';
+import { RULE_SETS } from '../src/_provider/Search/rulesClass';
 
-const pages = { ...part1, ...part2 };
+// @ts-ignore
+window.chrome.runtime.sendMessage = (message: any, callback: (response: any) => void) => {
+  if (message.name === 'xhr') {
+    if (message.url.startsWith('https://chibi.malsync.moe/')) {
+      let data: any = null;
+      if (message.url.endsWith('/list.json')) {
+        data = chibiList();
+      } else {
+        const chibiKey = message.url.split('/').pop().split('.json')[0];
+        const chibiList = chibiPages();
+
+        if (chibiKey && chibiList[chibiKey]) {
+          data = chibiList[chibiKey];
+        } else {
+          throw new NotFoundError('Chibi not found');
+        }
+      }
+
+      return callback({ responseText: JSON.stringify(data) });
+    }
+    return xhrAction(message, 'test', callback, 'testing');
+  }
+}
 
 // @ts-ignore
 window.MalSyncTest = async function() {
   const value: any = {};
 
-  const page = getPage(window.location.href);
+  const page = await Chibi().catch(e => {
+    if (e instanceof NotFoundError) {
+      return getPageConfig(window.location.href, pages);
+    }
+    throw e;
+  });
+
+  console.log('page Found', page);
+
   if (!page) {
     return 'Page Not Found';
   }
@@ -32,6 +68,18 @@ window.MalSyncTest = async function() {
           value.episode = parseInt(
             `${page.sync.getEpisode(window.location.href)}`,
           );
+          if (page.sync.getVolume) {
+            value.volume = parseInt(`${page.sync.getVolume(window.location.href)}`);
+          }
+          // Same filtering as the syncPage, NaN is no season
+          if (page.sync.getSeason) {
+            const season = parseInt(`${page.sync.getSeason(window.location.href)}`);
+            if (!Number.isNaN(season)) value.season = season;
+          }
+          if (page.sync.getRuleSet) {
+            const ruleSet = page.sync.getRuleSet(window.location.href);
+            if (RULE_SETS.includes(ruleSet)) value.ruleSet = ruleSet;
+          }
           value.overviewUrl = page.sync.getOverviewUrl(window.location.href);
           if (typeof page.sync.nextEpUrl !== 'undefined') {
             value.nextEpUrl = page.sync.nextEpUrl(window.location.href);
@@ -42,16 +90,34 @@ window.MalSyncTest = async function() {
             );
             value.uiSelector = j.$('#MAL-SYNC-TEST').text();
           }
-        } else {
+          if (typeof page.sync.getImage !== 'undefined') {
+            value.image = page.sync.getImage();
+          }
+        } else if (!page.isOverviewPage || page.isOverviewPage(window.location.href)) {
           value.sync = false;
           value.title = page.overview.getTitle(window.location.href);
           value.identifier = page.overview.getIdentifier(window.location.href);
+          // Same filtering as the syncPage, NaN is no season
+          if (page.overview.getSeason) {
+            const season = parseInt(`${page.overview.getSeason(window.location.href)}`);
+            if (!Number.isNaN(season)) value.season = season;
+          }
+          if (page.overview.getRuleSet) {
+            const ruleSet = page.overview.getRuleSet(window.location.href);
+            if (RULE_SETS.includes(ruleSet)) value.ruleSet = ruleSet;
+          }
           if (typeof page.overview.uiSelector !== 'undefined') {
             page.overview.uiSelector(
               '<div><div id="MAL-SYNC-TEST">TEST-UI</div></div>'
             );
             value.uiSelector = j.$('#MAL-SYNC-TEST').text();
           }
+          if (typeof page.overview.getImage !== 'undefined') {
+            value.image = page.overview.getImage();
+          }
+        } else {
+          reject('Not an overview or sync page');
+          return;
         }
 
         if (
@@ -75,6 +141,7 @@ window.MalSyncTest = async function() {
             value.epList = elementArray;
           }
         }
+        console.log('result', value);
         resolve(value);
       },
       cdn(type) {
@@ -100,40 +167,4 @@ function testForCloudflare() {
     return true;
   }
   return false;
-}
-
-function getPage(url) {
-  for (const key in pages) {
-    const page = pages[key];
-    if (j.$.isArray(page.domain)) {
-      var resPage;
-      page.domain.forEach(singleDomain => {
-        if (checkDomain(singleDomain)) {
-          page.domain = singleDomain;
-          resPage = page;
-        }
-      });
-      if(resPage) return resPage;
-    } else if (checkDomain(page.domain)) {
-      return page;
-    }
-
-    function checkDomain(domain) {
-      if (
-        url.indexOf(
-          `${
-            utils
-              .urlPart(domain, 2)
-              .replace('.com.br', '.br')
-              .split('.')
-              .slice(-2, -1)[0]
-          }.`,
-        ) > -1
-      ) {
-        return true;
-      }
-      return false;
-    }
-  }
-  return null;
 }

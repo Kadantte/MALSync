@@ -1,29 +1,37 @@
+import { reactive } from 'vue';
 import { Cache } from '../utils/Cache';
-import { Progress } from '../utils/progress';
+import { ProgressRelease } from '../utils/progressRelease';
 import { emitter } from '../utils/emitter';
 import { errorMessage as _errorMessage } from './Errors';
 
 Object.seal(emitter);
 
 export interface listElement {
-  uid: number;
-  malId: number;
+  uid: number | string;
+  malId: number | null;
   apiCacheKey: number | string;
   cacheKey: any;
   type: 'anime' | 'manga';
   title: string;
   url: string;
-  watchedEp: number;
-  totalEp: number;
-  status: number;
   score: number;
+  watchedEp: number;
+  readVol?: number;
+  totalEp: number;
+  totalVol?: number;
+  status: number;
+  startDate: string | null;
+  finishDate: string | null;
+  rewatchCount: number;
   image: string;
+  imageLarge?: string;
+  imageBanner?: string;
   tags: string;
-  airingState: number;
+  airingState?: number | string;
   fn: {
     continueUrl: () => string;
-    initProgress: () => void;
-    progress: false | Progress;
+    initProgress: () => Promise<void>;
+    progress: ProgressRelease | null;
   };
   options?: {
     u: string;
@@ -42,11 +50,15 @@ export abstract class ListAbstract {
 
   protected abstract authenticationUrl: string;
 
+  protected supportsTags = true;
+
   abstract readonly name;
 
   protected logger;
 
   public seperateRewatching = false;
+
+  public consideringSupport = false;
 
   // Modes
   modes = {
@@ -62,10 +74,14 @@ export abstract class ListAbstract {
 
   protected templist: listElement[] = [];
 
+  protected applyTemplist(list: listElement[]) {
+    this.templist = this.modes.frontend ? (reactive(list) as listElement[]) : list;
+  }
+
   constructor(
-    protected status: number = 1,
+    protected status = 1,
     protected listType: 'anime' | 'manga' = 'anime',
-    protected sort: string = 'default',
+    protected sort = 'default',
   ) {
     this.status = Number(this.status);
     this.logger = con.m('[S]', '#348fff');
@@ -75,7 +91,7 @@ export abstract class ListAbstract {
   public api = api;
 
   public setTemplist(list) {
-    this.templist = list;
+    this.applyTemplist(list);
     return this;
   }
 
@@ -118,14 +134,18 @@ export abstract class ListAbstract {
   async getNextPage(): Promise<listElement[]> {
     if (this.done) return this.templist;
 
-    if (this.modes.frontend && this.status === 1 && (this.sort === 'default' || this.sort === 'unread')) {
+    if (
+      this.modes.frontend &&
+      this.status === 1 &&
+      ['default', 'unread', 'latest_release'].includes(this.sort)
+    ) {
       this.modes.sortAiring = true;
       return this.getCompleteList();
     }
 
     await this.getNext();
 
-    if (this.modes.cached) this.getCache().setValue(this.templist.slice(0, 18));
+    if (this.modes.cached) this.getCache().setValue(this.templist.slice(0, 24));
 
     this.firstLoaded = true;
 
@@ -135,7 +155,7 @@ export abstract class ListAbstract {
   private async getNext() {
     this.loading = true;
     const retList = await this.getPart();
-    this.templist = this.templist.concat(retList);
+    this.applyTemplist(this.templist.concat(retList));
     this.loading = false;
   }
 
@@ -160,14 +180,12 @@ export abstract class ListAbstract {
       'update.*',
       data => {
         con.log('update', data);
-        if (data.cacheKey) {
-          const item = this.templist.find(el => el.cacheKey === data.cacheKey);
-          con.log(item);
-          if (item && data.state) {
-            item.watchedEp = data.state.episode;
-            item.score = data.state.score;
-            item.status = data.state.status;
-          }
+        if (!data.cacheKey) return;
+        const item = this.templist.find(el => el.cacheKey === data.cacheKey);
+        if (item && data.state) {
+          item.watchedEp = data.state.episode;
+          item.score = data.state.score;
+          item.status = data.state.status;
         }
       },
       { objectify: true },
@@ -180,15 +198,21 @@ export abstract class ListAbstract {
     }
   }
 
-  abstract getUsername(): Promise<string> | string;
+  public getUsername() {
+    return this.getUserObject().then(user => user.username);
+  }
+
+  abstract getUserObject(): Promise<{ username: string; picture: string; href: string }>;
 
   abstract _getSortingOptions(): { icon: string; title: string; value: string; asc?: boolean }[];
 
-  getSortingOptions(tree = false): { icon: string; title: string; value: string; child?: any }[] {
+  getSortingOptions(
+    simple = false,
+  ): { icon: string; title: string; value: string; asc?: boolean }[] {
     const res = [
       {
         icon: 'filter_list',
-        title: 'Default',
+        title: api.storage.lang('settings_progress_default'),
         value: 'default',
       },
     ];
@@ -196,26 +220,29 @@ export abstract class ListAbstract {
     if (this.status === 1 && this.listType === 'manga') {
       res.push({
         icon: 'adjust',
-        title: 'Unread',
+        title: api.storage.lang('list_sorting_unread'),
         value: 'unread',
       });
     }
 
+    res.push({
+      icon: 'fiber_new',
+      title: api.storage.lang('list_sorting_latest_release'),
+      value: 'latest_release',
+    });
+
     const options = this._getSortingOptions();
     options.forEach(el => {
-      if (el.asc) {
-        const asc = { ...el };
-        delete asc.asc;
-        asc.value += '_asc';
-        asc.title += ' Ascending';
-        if (tree) {
-          // @ts-ignore
-          el.child = asc;
-        } else {
+      if (!simple) {
+        if (el.asc) {
+          const asc = { ...el };
+          delete asc.asc;
+          asc.value += '_asc';
+          asc.title += ' Ascending';
           res.push(asc);
         }
+        delete el.asc;
       }
-      delete el.asc;
       res.push(el);
     });
     return res;
@@ -232,8 +259,15 @@ export abstract class ListAbstract {
   }
 
   // itemFunctions;
-  async fn(item, streamurl = '') {
+  async fn(
+    // TODO: Remove 'startDate' | 'finishDate' | 'rewatchCount' from Omit when all providers are updated
+    passedItem: Omit<listElement, 'fn' | 'startDate' | 'finishDate' | 'rewatchCount'> & {
+      [k: string]: any;
+    },
+    streamurl = '',
+  ) {
     let continueUrlTemp: any = null;
+    const item = passedItem as listElement;
     item.fn = {
       continueUrl: () => {
         if (continueUrlTemp !== null) return continueUrlTemp;
@@ -248,14 +282,19 @@ export abstract class ListAbstract {
         });
       },
       initProgress: () => {
-        return new Progress(item.cacheKey, item.type).init().then(progress => {
+        return new ProgressRelease(item.cacheKey, item.type).init().then(progress => {
           item.fn.progress = progress;
         });
       },
-      progress: false,
+      progress: null,
     };
-    item.options = await utils.getEntrySettings(item.type, item.cacheKey, item.tags);
-    if (streamurl) item.options.u = streamurl;
+    item.options = await utils.getEntrySettings(
+      item.type,
+      item.cacheKey,
+      item.tags,
+      this.supportsTags,
+    );
+    if (streamurl) item.options!.u = streamurl;
     if (this.modes.sortAiring || this.modes.initProgress) await item.fn.initProgress();
 
     return item;
@@ -277,14 +316,19 @@ export abstract class ListAbstract {
       return;
     }
 
+    if (this.sort === 'latest_release') {
+      this.applyTemplist(this.templist.sort(sortItemsByLastTimestamp));
+      return;
+    }
+
     const normalItems: listElement[] = [];
     let preItems: listElement[] = [];
     let watchedItems: listElement[] = [];
     this.templist.forEach(item => {
       const prediction = item.fn.progress;
       if (this.listType === 'anime') {
-        if (prediction && prediction.isAiring() && prediction.getPredictionTimestamp()) {
-          if (item.watchedEp < prediction.getCurrentEpisode()) {
+        if (prediction?.isAiring() && prediction.progress()?.getCurrentEpisode()) {
+          if (item.watchedEp < prediction.progress()!.getCurrentEpisode()!) {
             preItems.push(item);
           } else {
             watchedItems.push(item);
@@ -294,27 +338,66 @@ export abstract class ListAbstract {
         }
       } else if (
         // Manga only if less than 5 chapters to read
-        prediction &&
-        prediction.isAiring() &&
-        prediction.getCurrentEpisode() &&
+        prediction?.isAiring() &&
+        prediction.progress()?.getCurrentEpisode() &&
         item.watchedEp &&
-        item.watchedEp < prediction.getCurrentEpisode() &&
-        item.watchedEp + 6 > prediction.getCurrentEpisode()
+        item.watchedEp < prediction.progress()!.getCurrentEpisode()! &&
+        item.watchedEp + 6 > prediction.progress()!.getCurrentEpisode()!
       ) {
         preItems.push(item);
       } else {
         normalItems.push(item);
       }
     });
+    if (this.listType === 'anime') {
+      preItems = orderItems(preItems, true);
+      watchedItems = orderItems(watchedItems, false);
+    } else {
+      preItems = orderItems(preItems, false);
+      watchedItems = orderItems(watchedItems, false);
+    }
 
-    preItems = preItems.sort(sortItems).reverse();
-    watchedItems = watchedItems.sort(sortItems);
+    this.applyTemplist(preItems.concat(watchedItems, normalItems));
 
-    this.templist = preItems.concat(watchedItems, normalItems);
+    function orderItems(items: listElement[], reverse = false) {
+      const itemsWithPrediction: listElement[] = [];
+      const itemsWithLastTimestamp: listElement[] = [];
+      const itemsWithoutTimestamp: listElement[] = [];
 
-    function sortItems(a, b) {
-      let valA = a.fn.progress.getPredictionTimestamp();
-      let valB = b.fn.progress.getPredictionTimestamp();
+      items.forEach(item => {
+        if (item.fn.progress?.progress()?.getPredictionTimestamp()) {
+          itemsWithPrediction.push(item);
+        } else if (item.fn.progress?.progress()?.getLastTimestamp()) {
+          itemsWithLastTimestamp.push(item);
+        } else {
+          itemsWithoutTimestamp.push(item);
+        }
+      });
+
+      itemsWithPrediction.sort(sortItemsByPrediction);
+      itemsWithLastTimestamp.sort(sortItemsByLastTimestamp);
+
+      if (reverse) {
+        itemsWithPrediction.reverse();
+        itemsWithLastTimestamp.reverse();
+      }
+
+      return [...itemsWithPrediction, ...itemsWithLastTimestamp, ...itemsWithoutTimestamp];
+    }
+
+    function sortItemsByLastTimestamp(a: listElement, b: listElement) {
+      const valA = a.fn.progress?.progress()?.getLastTimestamp();
+      const valB = b.fn.progress?.progress()?.getLastTimestamp();
+
+      if (!valA || !a.fn.progress?.isAiring()) return 1;
+      if (!valB || !b.fn.progress?.isAiring()) return -1;
+
+      return valB - valA;
+    }
+
+    function sortItemsByPrediction(a: listElement, b: listElement) {
+      let valA = a.fn.progress?.progress()?.getPredictionTimestamp();
+      let valB = b.fn.progress?.progress()?.getPredictionTimestamp();
 
       if (!valA) valA = 999999999999;
       if (!valB) valB = valA;
@@ -324,28 +407,33 @@ export abstract class ListAbstract {
   }
 
   sortUnread() {
-    this.templist = this.templist.sort(function(a, b) {
-      let valA = 10000;
-      let valB = 10000;
+    this.applyTemplist(
+      this.templist.sort(function (a, b) {
+        let valA = 10000;
+        let valB = 10000;
 
-      if (a.fn.progress && a.fn.progress.getCurrentEpisode()) {
-        const tempA = a.fn.progress.getCurrentEpisode() - a.watchedEp;
-        if (tempA > 0) valA = tempA;
-      }
-      if (b.fn.progress && b.fn.progress.getCurrentEpisode()) {
-        const tempB = b.fn.progress.getCurrentEpisode() - b.watchedEp;
-        if (tempB > 0) valB = tempB;
-      }
+        if (a.fn.progress?.isAiring() && a.fn.progress.progress()?.getCurrentEpisode()) {
+          const tempA = a.fn.progress.progress()!.getCurrentEpisode()! - a.watchedEp;
+          if (tempA > 0) valA = tempA;
+        }
+        if (b.fn.progress?.isAiring() && b.fn.progress.progress()?.getCurrentEpisode()) {
+          const tempB = b.fn.progress.progress()!.getCurrentEpisode()! - b.watchedEp;
+          if (tempB > 0) valB = tempB;
+        }
 
-      return valA - valB;
-    });
+        return valA - valB;
+      }),
+    );
   }
 
   cacheObj: any = undefined;
 
   getCache() {
     if (this.cacheObj) return this.cacheObj;
-    this.cacheObj = new Cache(`list/${this.name}/${this.listType}/${this.status}/${this.sort}`, 48 * 60 * 60 * 1000);
+    this.cacheObj = new Cache(
+      `list/${this.name}/${this.listType}/${this.status}/${this.sort}`,
+      48 * 60 * 60 * 1000,
+    );
     return this.cacheObj;
   }
 }

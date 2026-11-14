@@ -7,23 +7,23 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-node@v2
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
       with:
-        node-version: '16.x'
+        node-version: '24.x'
     - name: Build
       run: |
         npm ci
         npm run build
       env:
-        MODE: dev
+        CI_MODE: dev
     - name: Pack
       run: |
         npm run package
       env:
-        MODE: dev
+        CI_MODE: dev
     - name: Deploy
-      uses: trmcnvn/chrome-addon@v2
+      uses: trmcnvn/chrome-addon@7fc5a5ad3ff597dc64d6a13de7dcaa8515328be7 # v2
       with:
         extension: neekhcfkcjbddejgenpcdnpnidnfdgoh
         zip: dist/webextension.zip

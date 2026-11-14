@@ -1,15 +1,24 @@
+import { reactive, ref } from 'vue';
+import { ChibiListRepository } from '../pages-chibi/loader/ChibiListRepository';
+import type { PageListJsonInterface } from '../pages-chibi/pageInterface';
+
 export const settingsObj = {
-  options: {
+  options: reactive({
     autoTrackingModeanime: 'video',
+    readerTracking: true,
+    askBefore: true,
     autoTrackingModemanga: 'instant',
     enablePages: {},
     forceEn: false,
+    forceEnglishTitles: false,
     rpc: true,
     presenceLargeImage: 'cover',
     presenceShowButtons: true,
+    presenceActivityName: 'title',
     userscriptModeButton: false,
     syncMode: 'MAL',
     syncModeSimkl: 'MAL',
+    splitTracking: false,
     localSync: true,
     delay: 0,
     videoDuration: 85,
@@ -18,44 +27,44 @@ export const settingsObj = {
     malResume: true,
     usedPage: true,
     epPredictions: true,
+    mangaCompletionPercentage: 90,
 
     theme: 'auto',
+    themeSidebars: true,
+    themeColor: '#000000',
+    themeOpacity: 100,
+    themeImage: '',
+
     minimalWindow: false,
     posLeft: 'left',
     miniMALonMal: false,
     floatButtonStealth: false,
     minimizeBigPopup: false,
-    floatButtonCorrection: false,
+    floatButtonCorrection: true,
     floatButtonHide: false,
     autoCloseMinimal: false,
     outWay: true,
-    miniMalWidth: '500px',
+    miniMalWidth: '550px',
     miniMalHeight: '90%',
     malThumbnail: 100,
     friendScore: true,
     loadPTWForProgress: false,
 
     quicklinks: [
-      '9anime',
       'Crunchyroll',
-      'Gogoanime',
-      'Twistmoe',
       'Mangadex',
       'MangaNato',
-      'AnimeSimple',
       'MangaFox',
-      'MangaSee',
-      'YugenAnime',
-      'AniMixPlay',
-      'Zoro',
-      'Funimation',
+      'MangaFire',
       'Hulu',
       'Netflix',
       'Hidive',
-      'Vrv',
       'VIZ',
       'MangaPlus',
       'MangaReader',
+      'WeebCentral',
+      'KickAssAnime',
+      'animepahe',
     ],
     quicklinksPosition: 'default',
 
@@ -78,11 +87,16 @@ export const settingsObj = {
     progressIntervalDefaultManga: 'en/sub',
     progressNotificationsAnime: true,
     progressNotificationsManga: true,
+    notificationsSticky: true,
 
     bookMarksList: false,
+    bookMarksListManga: false,
 
     customDomains: [],
 
+    chibiRepos: [],
+
+    anilistExternalSources: false,
     anilistUpdateUi: true,
 
     anilistToken: '',
@@ -100,7 +114,24 @@ export const settingsObj = {
 
     malToken: '',
     malRefresh: '',
-  },
+
+    mangabakaToken: '',
+    mangabakaRefresh: '',
+
+    animeoshiToken: '',
+    animeoshiRefresh: '',
+
+    shikiToken: '',
+    shikiOptions: {
+      locale: 'ru',
+    },
+  }),
+
+  debounceArray: {},
+
+  chibiList: {} as PageListJsonInterface['pages'],
+
+  isInit: ref(false),
 
   async init() {
     const tempSettings = [];
@@ -111,6 +142,14 @@ export const settingsObj = {
         tempSettings[key] = /(token|refresh)/i.test(key) && store ? '********' : store;
       }
     }
+
+    try {
+      const chibiRepo = await (await ChibiListRepository.getInstance(true)).init();
+      this.chibiList = chibiRepo.getList();
+    } catch (e) {
+      con.error('Error loading chibi repo', e);
+    }
+
     con.log('Settings', tempSettings);
 
     let rateDebounce;
@@ -121,7 +160,7 @@ export const settingsObj = {
           const storageChange = changes[key];
           if (/^settings\//i.test(key)) {
             this.options[key.replace('settings/', '')] = storageChange.newValue;
-            con.info(`Update ${key} option to ${storageChange.newValue}`);
+            con.info(`Update ${key} option to ${JSON.stringify(storageChange.newValue, null, 2)}`);
           }
         }
       }
@@ -149,10 +188,13 @@ export const settingsObj = {
       }
     });
 
+    this.isInit.value = true;
+
     return this;
   },
 
   get(name: string) {
+    if (!this.isInit.value) throw 'Settings not initialized';
     return this.options[name];
   },
 
@@ -167,9 +209,24 @@ export const settingsObj = {
     return api.storage.set(`settings/${name}`, value);
   },
 
+  setDebounce(name: string, value: any) {
+    this.options[name] = value;
+    clearTimeout(this.debounceArray[name]);
+    this.debounceArray[name] = setTimeout(() => {
+      this.set(name, value);
+      delete this.debounceArray[name];
+    }, 1000);
+  },
+
   async getAsync(name: string) {
     const value = await api.storage.get(`settings/${name}`);
-    if (typeof value === 'undefined' && typeof this.options[name] !== 'undefined') return this.options[name];
+    if (typeof value === 'undefined' && typeof this.options[name] !== 'undefined')
+      return this.options[name];
     return value;
+  },
+
+  getStaticChibi(): PageListJsonInterface['pages'] {
+    if (!this.isInit.value) throw 'Settings not initialized';
+    return this.chibiList;
   },
 };

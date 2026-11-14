@@ -1,43 +1,79 @@
-import { SyncPage } from './pages/syncPage';
+import { SyncPage } from './pages-sync/syncPage';
 import { MyAnimeListClass } from './myanimelist/myanimelistClass';
 import { AnilistClass } from './anilist/anilistClass';
 import { KitsuClass } from './kitsu/kitsuClass';
 import { SimklClass } from './simkl/simklClass';
 import { firebaseNotification } from './utils/firebaseNotification';
-import { getPlayerTime, shortcutListener } from './utils/player';
+import { PlayerSingleton, shortcutListener } from './utils/player';
 import { pages } from './pages/pages';
 import { oauth } from './utils/oauth';
 import { floatClick } from './floatbutton/userscript';
 import { initUserProgressScheduler } from './background/releaseProgress';
 import { pwa } from './floatbutton/userscriptPwa';
 import { databaseRequest, initDatabase } from './background/database';
+import { anilistOauth } from './anilist/oauth';
+import { shikiOauth } from './_provider/Shikimori/oauth';
+import { Chibi } from './pages-chibi/ChibiProxy';
+import { NotFoundError } from './_provider/Errors';
+import { mangabakaOauth } from './mangabaka/oauth';
+import { animeoshiOauth } from './animeoshi/oauth';
+import { MangaBakaClass } from './mangabaka/MangaBakaClass';
 
 let page;
 
-function main() {
-  if (window.location.href.indexOf('myanimelist.net') > -1) {
+async function main() {
+  if (utils.isDomainMatching(window.location.href, 'myanimelist.net')) {
     injectDb();
     const mal = new MyAnimeListClass(window.location.href);
     mal.init();
     if (window.location.href.indexOf('episode') > -1) {
-      runPage();
+      await runPage();
     }
-  } else if (window.location.href.indexOf('anilist.co') > -1) {
+  } else if (utils.isDomainMatching(window.location.href, 'anilist.co')) {
     /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
     const anilist = new AnilistClass(window.location.href);
-  } else if (window.location.href.indexOf('kitsu.io') > -1) {
+  } else if (utils.isDomainMatching(window.location.href, 'kitsu.app')) {
     /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
     const kitsu = new KitsuClass(window.location.href);
-  } else if (window.location.href.indexOf('simkl.com') > -1) {
+  } else if (utils.isDomainMatching(window.location.href, 'mangabaka.org')) {
+    /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
+    const mangabaka = new MangaBakaClass();
+  } else if (utils.isDomainMatching(window.location.href, 'simkl.com')) {
     /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
     const simkl = new SimklClass(window.location.href);
-  } else if (window.location.href.indexOf('malsync.moe/mal/oauth') > -1) {
+  } else if (
+    window.location.hostname === 'malsync.moe' &&
+    window.location.pathname.startsWith('/mal/oauth')
+  ) {
     oauth();
-  } else if (window.location.href.indexOf('malsync.moe/pwa') > -1) {
+  } else if (
+    window.location.hostname === 'malsync.moe' &&
+    window.location.pathname.startsWith('/anilist/oauth')
+  ) {
+    anilistOauth();
+  } else if (
+    window.location.hostname === 'malsync.moe' &&
+    window.location.pathname.startsWith('/mangabaka/oauth')
+  ) {
+    mangabakaOauth();
+  } else if (
+    window.location.hostname === 'malsync.moe' &&
+    window.location.pathname.startsWith('/animeoshi/oauth')
+  ) {
+    animeoshiOauth();
+  } else if (
+    window.location.hostname === 'malsync.moe' &&
+    window.location.pathname.startsWith('/shikimori/oauth')
+  ) {
+    shikiOauth();
+  } else if (
+    window.location.hostname === 'malsync.moe' &&
+    window.location.pathname.startsWith('/pwa')
+  ) {
     injectDb();
     pwa();
   } else {
-    runPage();
+    await runPage();
   }
   firebaseNotification();
 
@@ -66,10 +102,17 @@ api.settings.init().then(() => {
   main();
 });
 
-function runPage() {
+async function runPage() {
+  const pageObjects = await Chibi().catch(e => {
+    if (e instanceof NotFoundError) {
+      return pages;
+    }
+    throw e;
+  });
+
   try {
     if (inIframe()) throw 'iframe';
-    page = new SyncPage(window.location.href, pages, floatClick);
+    page = new SyncPage(window.location.href, pageObjects, floatClick);
   } catch (e) {
     con.info(e);
     iframe();
@@ -77,19 +120,18 @@ function runPage() {
   }
   page.init();
   api.storage.set('iframePlayer', 'null');
-  setInterval(async function() {
+  setInterval(async function () {
     const item = await api.storage.get('iframePlayer');
     if (typeof item !== 'undefined' && item !== 'null') {
-      page.setVideoTime(item, function(time) {
-        /* Do nothing */
-      });
+      PlayerSingleton.getInstance().setIframeProgress(item);
       api.storage.set('iframePlayer', 'null');
     }
   }, 2000);
 }
 
 function iframe() {
-  getPlayerTime(function(item) {
+  const player = PlayerSingleton.getInstance().startTracking();
+  player.addListener('iframe', item => {
     api.storage.set('iframePlayer', item);
   });
 }

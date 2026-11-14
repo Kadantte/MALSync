@@ -1,6 +1,0 @@
-{
-  "search": "https://comick.fun/search?q={searchterm}",
-  "urls": {
-    "match": ["*://comick.fun/*"]
-  }
-}

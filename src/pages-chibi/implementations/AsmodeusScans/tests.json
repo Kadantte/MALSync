@@ -1,0 +1,44 @@
+{
+    "title": "AsmodeusScans",
+    "url": "https://asmotoon.com",
+    "testCases": [
+      {
+        "url": "https://asmotoon.com/chapter/63fee55d460-63fee663c59/",
+        "expected": {
+          "sync": true,
+          "title": "The Villainess, Who Is No Better Than an Extra, Cross-Dresses to Be a Love Interest",
+          "identifier": "the-villainess-who-is-no-better-than-an-extra-cross-dresses-to-be-a-love-interest",
+          "overviewUrl": "https://asmotoon.com/series/the-villainess-who-is-no-better-than-an-extra-cross-dresses-to-be-a-love-interest/",
+          "episode": 8,
+          "nextEpUrl": "https://asmotoon.com/chapter/63fee55d460-63fee6db228/",
+          "uiSelector": false
+        }
+      },
+      {
+        "url": "https://asmotoon.com/chapter/62f01b00044-639ab1158f8/",
+        "expected": {
+          "sync": true,
+          "title": "Yamamoto-san Gets Caught Up in a Death Game and Destroys the Game Balance",
+          "identifier": "yamamoto-san-gets-caught-up-in-a-death-game-and-destroys-the-game-balance",
+          "overviewUrl": "https://asmotoon.com/series/yamamoto-san-gets-caught-up-in-a-death-game-and-destroys-the-game-balance/",
+          "episode": 4,
+          "nextEpUrl": "https://asmotoon.com/chapter/62f01b00044-63d31262fcd/",
+          "uiSelector": false
+        }
+      },
+      {
+        "url": "https://asmotoon.com/series/yamamoto-san-gets-caught-up-in-a-death-game-and-destroys-the-game-balance/",
+        "expected": {
+          "sync": false,
+          "title": "Yamamoto-san Gets Caught Up in a Death Game and Destroys the Game Balance",
+          "identifier": "yamamoto-san-gets-caught-up-in-a-death-game-and-destroys-the-game-balance",
+          "image": "https://wsrv.nl/?url=cdn.meowing.org/uploads/H_X8n3chije",
+          "uiSelector": true,
+          "epList": {
+            "4" : "https://asmotoon.com/chapter/62f01b00044-639ab1158f8/",
+            "6" : "https://asmotoon.com/chapter/62f01b00044-64017b338ad/"
+          }
+        }
+      }
+    ]
+  }

@@ -1,4 +1,3 @@
-// eslint-disable-next-line import/no-extraneous-dependencies
 import semverGt from 'semver/functions/gt';
 
 export async function upgradewWizzards(lastVersion) {
@@ -57,14 +56,41 @@ export async function upgradewWizzards(lastVersion) {
       },
     },
     {
-      version: '0.8.18',
+      version: '0.8.19',
       name: 'Split notification options',
       action: () => {
         return api.storage.get('settings/progressNotifications').then(res => {
-          if (!res) {
-            api.storage.set('settings/progressNotificationsAnime', false);
-            api.storage.set('settings/progressNotificationsManga', false);
-          }
+          let mode = true;
+          if (typeof res !== 'undefined' && res === false) mode = false;
+          api.storage.set('settings/progressNotificationsAnime', mode);
+          api.storage.set('settings/progressNotificationsManga', mode);
+        });
+      },
+    },
+    {
+      version: '0.9.0',
+      name: 'Migrate serial theme',
+      action: () => {
+        return api.storage.get('settings/theme').then(res => {
+          if (typeof res !== 'undefined' && res === 'serial')
+            api.storage.set('settings/theme', 'auto');
+        });
+      },
+    },
+    {
+      version: '0.11.0',
+      name: 'Disable background listsync',
+      action: () => {
+        return api.storage.remove('backgroundListSync');
+      },
+    },
+    {
+      version: '*',
+      name: 'Remove auto domain permissions',
+      action: () => {
+        return api.settings.getAsync('customDomains').then(perms => {
+          const filteredDomains = perms.filter(customDomain => !customDomain.auto);
+          return api.settings.set('customDomains', filteredDomains);
         });
       },
     },
@@ -72,7 +98,7 @@ export async function upgradewWizzards(lastVersion) {
 
   for (let i = 0; i < wizards.length; i++) {
     const wizard = wizards[i];
-    if (semverGt(wizard.version, lastVersion)) {
+    if (wizard.version === '*' || semverGt(wizard.version, lastVersion)) {
       logger.m(wizard.version).log(wizard.name);
 
       try {

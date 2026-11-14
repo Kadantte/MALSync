@@ -1,17 +1,15 @@
-import { fullscreenNotification, getPlayerTime, shortcutListener } from './utils/player';
-import { initShark } from './utils/shark';
-
-initShark();
+import { fullscreenNotification, PlayerSingleton, shortcutListener } from './utils/player';
 
 let tempPlayer: any;
 
-getPlayerTime(function(item, player) {
+const playerInstance = PlayerSingleton.getInstance().startTracking();
+playerInstance.addListener('iframe', (item, player) => {
   chrome.runtime.sendMessage({ name: 'videoTime', item });
   tempPlayer = player;
 });
 
 // @ts-ignore
-chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
+chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   if (msg.action === 'videoTimeSet') {
     con.log('[Iframe] Set Time', msg);
     if (typeof tempPlayer === 'undefined') {

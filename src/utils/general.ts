@@ -22,22 +22,13 @@ export function urlParam(url, name) {
   return decodeURI(results[1]) || 0;
 }
 
-export function getBaseText(element) {
-  let text = element.text();
-  element.children().each(function() {
-    // @ts-ignore
-    text = text.replace(j.$(this).text(), '');
-  });
-  return text;
-}
-
-/**
- * Generates a (hex) string ID for randomisation/verification.
- */
-export function generateUniqueID(arraySize = 10): string {
-  const array = new Uint32Array(arraySize);
-  window.crypto.getRandomValues(array);
-  return Array.from(array, value => value.toString(16)).join('');
+export function getBaseText(element: JQuery<Element>) {
+  return element
+    .contents()
+    .filter(function () {
+      return this.nodeType === Node.TEXT_NODE;
+    })
+    .text();
 }
 
 export function favicon(domain) {
@@ -64,13 +55,12 @@ export function episode(type: 'anime' | 'manga') {
   return api.storage.lang('UI_Episode');
 }
 
-export const syncRegex = /(^settings\/.*|^updateCheckTime$|^tempVersion$|^local:\/\/|^list-tagSettings$)/;
+export const syncRegex =
+  /(^settings\/.*|^updateCheckTime$|^tempVersion$|^local:\/\/|^list-tagSettings$)/;
 
-export const rateLimitExclude = /^https:\/\/api.malsync.moe\/(mal\/|nc\/mal\/.*\/progress$)/i;
+export const rateLimitExclude = /^https:\/\/api.malsync.moe\/(shark|mal\/|nc\/mal\/.*\/progress$)/i;
 
-// eslint-disable-next-line no-shadow
 export enum status {
-  // eslint-disable-next-line no-shadow
   watching = 1,
   completed = 2,
   onhold = 3,
@@ -110,7 +100,7 @@ export function parseHtml(text) {
 
 export function urlChangeDetect(callback) {
   let currentPage = window.location.href;
-  return setInterval(function() {
+  return setInterval(function () {
     if (currentPage !== window.location.href) {
       currentPage = window.location.href;
       callback();
@@ -120,7 +110,7 @@ export function urlChangeDetect(callback) {
 
 export function fullUrlChangeDetect(callback, strip = false) {
   let currentPage = '';
-  const intervalId = setInterval(function() {
+  const intervalId = setInterval(function () {
     const url = strip ? urlStrip(window.location.href) : window.location.href;
     if (currentPage !== url) {
       currentPage = url;
@@ -131,9 +121,9 @@ export function fullUrlChangeDetect(callback, strip = false) {
   return Number(intervalId);
 }
 
-export function changeDetect(callback, func) {
+export function changeDetect(callback, func, immediate = false) {
   let currentPage = func();
-  const intervalId = setInterval(function() {
+  const intervalId = setInterval(function () {
     const temp = func();
     if (typeof temp !== 'undefined' && currentPage !== temp) {
       currentPage = func();
@@ -141,12 +131,26 @@ export function changeDetect(callback, func) {
     }
   }, 500);
 
+  if (immediate) callback();
+
   return Number(intervalId);
 }
 
-export function waitUntilTrue(condition: Function, callback: Function, interval = 100) {
-  const intervalId = setInterval(function() {
-    if (condition()) {
+export function waitUntilTrue(condition: Function, callback: Function, interval = 200) {
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises
+  const intervalId = setInterval(async function () {
+    let state = false;
+    try {
+      const conditionState = condition() as boolean | Promise<boolean>;
+      if (conditionState && conditionState instanceof Promise) {
+        state = await conditionState;
+      } else {
+        state = conditionState;
+      }
+    } catch (e) {
+      con.info('Error in waitUntilTrue', e);
+    }
+    if (state) {
       clearInterval(intervalId);
       callback();
     }
@@ -178,13 +182,17 @@ export function getAsyncWaitUntilTrue(condition: Function, interval = 100) {
 const doubleId = Math.random();
 export function checkDoubleExecution() {
   if ($('.mal-sync-double-detect').length) {
-    $('.mal-sync-double-detect').each(function(index) {
+    $('.mal-sync-double-detect').each(function (index) {
       if ($(this).text() !== doubleId.toString()) {
         alert('Double execution detected! Please run MAL-Sync once only.');
       }
     });
   }
-  $('body').after(j.html(`<div class="mal-sync-double-detect" style="display: none;">${doubleId.toString()}</div>`));
+  $('body').after(
+    j.html(
+      `<div class="mal-sync-double-detect" style="display: none;">${doubleId.toString()}</div>`,
+    ),
+  );
 }
 
 export function getUrlFromTags(tags: string) {
@@ -242,7 +250,8 @@ export async function getContinueWaching(type, id): Promise<{ url?: string; ep?:
   return api.storage.get(`continue/${type}/${id}`);
 }
 
-export async function setEntrySettings(type, id, options, tags = '') {
+export async function setEntrySettings(type, id, options, tags = '', useTags = true) {
+  const tagMode = useTags && api.settings.get('malTags');
   const tempOptions = {};
   if (options) {
     for (const key in options) {
@@ -255,7 +264,7 @@ export async function setEntrySettings(type, id, options, tags = '') {
       }
     }
 
-    if (api.settings.get('malTags')) {
+    if (tagMode) {
       // TAG mode
       tags = setUrlInTags(JSON.stringify(tempOptions), tags);
     } else {
@@ -266,7 +275,7 @@ export async function setEntrySettings(type, id, options, tags = '') {
 
   if (!Object.values(tempOptions).find(el => Boolean(el))) {
     tags = setUrlInTags('', tags);
-    if (!api.settings.get('malTags')) {
+    if (!tagMode) {
       await api.storage.remove(`tagSettings/${type}/${id}`);
     }
   }
@@ -274,7 +283,7 @@ export async function setEntrySettings(type, id, options, tags = '') {
   return tags;
 }
 
-export async function getEntrySettings(type, id, tags = '') {
+export async function getEntrySettings(type, id, tags = '', useTags = true) {
   const tempOptions: any = {
     u: null, // url
     c: null, // Continue Url
@@ -282,7 +291,7 @@ export async function getEntrySettings(type, id, tags = '') {
     p: '', // Progress Mode
   };
 
-  if (api.settings.get('malTags')) {
+  if (useTags && api.settings.get('malTags')) {
     // TAG mode
     const tagString = getUrlFromTags(tags);
     if (tagString) {
@@ -372,7 +381,6 @@ export function canHideTabs() {
   return false;
 }
 
-// eslint-disable-next-line no-shadow
 export function statusTag(status, type, id) {
   const info = {
     anime: {
@@ -441,7 +449,7 @@ export function statusTag(status, type, id) {
     },
   };
 
-  $.each([1, 2, 3, 4, 6, 23], function(i, el) {
+  $.each([1, 2, 3, 4, 6, 23], function (i, el) {
     info.anime[info.anime[el].title] = info.anime[el];
     info.manga[info.manga[el].title] = info.manga[el];
   });
@@ -465,8 +473,12 @@ export function getStatusText(type: 'anime' | 'manga', state) {
       return api.storage.lang('UI_Status_Dropped');
     case 6:
       return api.storage.lang(`UI_Status_planTo_${type}`);
+    case 7:
+      return api.storage.lang('UI_Status_All');
     case 23:
       return api.storage.lang(`UI_Status_Rewatching_${type}`);
+    case 24:
+      return api.storage.lang('UI_Status_Considering');
     default:
       return '';
   }
@@ -474,8 +486,8 @@ export function getStatusText(type: 'anime' | 'manga', state) {
 
 // eslint-disable-next-line consistent-return
 export function notifications(url: string, title: string, message: string, iconUrl = '') {
-  const messageObj: chrome.notifications.NotificationOptions<true> = {
-    type: 'basic',
+  const messageObj = {
+    type: 'basic' as const,
     title,
     message,
     iconUrl,
@@ -544,7 +556,11 @@ export function flashm(
   }
 
   let flashdiv = '#flash-div-bottom';
-  if (typeof options !== 'undefined' && typeof options.position !== 'undefined' && options.position) {
+  if (
+    typeof options !== 'undefined' &&
+    typeof options.position !== 'undefined' &&
+    options.position
+  ) {
     flashdiv = `#flash-div-${options.position}`;
   }
 
@@ -570,28 +586,44 @@ export function flashm(
         </div>\
       </div>`;
 
-  let flashmEl;
+  let flashmEl: JQuery<HTMLElement>;
 
-  if (typeof options !== 'undefined' && typeof options.hoverInfo !== 'undefined' && options.hoverInfo) {
+  if (
+    typeof options !== 'undefined' &&
+    typeof options.hoverInfo !== 'undefined' &&
+    options.hoverInfo
+  ) {
     messClass += ' flashinfo';
     mess = `<div class="${messClass}" style="display:none; max-height: 5000px; overflow: hidden;"><div style="display:table; pointer-events: all; margin: 0 auto; margin-top: -2px; max-width: 60%; -webkit-border-radius: 20px;-moz-border-radius: 20px;border-radius: 2px;color: white;background:${colorF}; position: relative;"><div style="max-height: 60vh; overflow-y: auto; padding: 14px 24px 14px 24px;">${text}</div></div></div>`;
     j.$('#flashinfo-div').addClass('hover');
     // eslint-disable-next-line jquery-unsafe-malsync/no-xss-jquery
     flashmEl = j.$(j.html(mess)).appendTo('#flashinfo-div');
-    if (typeof options !== 'undefined' && typeof options.minimized !== 'undefined' && options.minimized)
+    if (
+      typeof options !== 'undefined' &&
+      typeof options.minimized !== 'undefined' &&
+      options.minimized
+    )
       flashmEl.css('max-height', '8px');
   } else {
     // eslint-disable-next-line jquery-unsafe-malsync/no-xss-jquery
     flashmEl = j.$(j.html(mess)).appendTo(flashdiv);
   }
 
-  if (typeof options !== 'undefined' && typeof options.permanent !== 'undefined' && options.permanent) {
+  if (
+    typeof options !== 'undefined' &&
+    typeof options.permanent !== 'undefined' &&
+    options.permanent
+  ) {
     flashmEl.slideDown(800);
-  } else if (typeof options !== 'undefined' && typeof options.hoverInfo !== 'undefined' && options.hoverInfo) {
+  } else if (
+    typeof options !== 'undefined' &&
+    typeof options.hoverInfo !== 'undefined' &&
+    options.hoverInfo
+  ) {
     flashmEl
       .slideDown(800)
       .delay(4000)
-      .queue(function() {
+      .queue(function () {
         j.$('#flashinfo-div').removeClass('hover');
         flashmEl.css('max-height', '8px');
       });
@@ -618,7 +650,7 @@ export async function flashConfirm(
   },
   yesNo = false,
 ): Promise<boolean> {
-  return new Promise(function(resolve, reject) {
+  return new Promise(function (resolve, reject) {
     let yesText = api.storage.lang('Ok');
     let noText = api.storage.lang('Cancel');
     if (yesNo) {
@@ -631,21 +663,21 @@ export async function flashConfirm(
       position: 'top',
       type,
     });
-    flasmessage.find('.Yes').click(function(evt) {
+    flasmessage.find('.Yes').click(function (evt) {
       resolve(true);
       j.$(evt.target)
         .parentsUntil('.flash')
-        .fadeOut(300, function() {
+        .fadeOut(300, function () {
           // @ts-ignore
           j.$(this).remove();
         });
       yesCall();
     });
-    flasmessage.find('.Cancel').click(function(evt) {
+    flasmessage.find('.Cancel').click(function (evt) {
       resolve(false);
       j.$(evt.target)
         .parentsUntil('.flash')
-        .fadeOut(300, function() {
+        .fadeOut(300, function () {
           // @ts-ignore
           j.$(this).remove();
         });
@@ -668,7 +700,7 @@ function initflashm() {
                  #flashinfo-div.hover .flashinfo{
                     opacity: 1;
                  }
-                 .flashinfo:hover{
+                 .flashinfo:hover, .flashinfo.open{
                     max-height:5000px !important;
                     z-index: 2147483647;
                     opacity: 1;
@@ -677,7 +709,7 @@ function initflashm() {
                  .flashinfo .synopsis{
                     transition: max-height 2s, max-width 2s ease 2s;
                  }
-                 .flashinfo:hover .synopsis{
+                 .flashinfo:hover .synopsis, .flashinfo.open .synopsis{
                     max-height:9999px !important;
                     max-width: 500px !important;
                     transition: max-height 2s;
@@ -688,16 +720,6 @@ function initflashm() {
                  }
                  #flashinfo-div:hover, #flashinfo-div.hover{
                   z-index: 2147483647;
-                 }
-                 #flashinfo-div.player-error {
-                   z-index: 2147483647;
-                 }
-                 #flashinfo-div.player-error .type-update{
-                  overflow: visible !important;
-                  opacity: 1 !important;
-                 }
-                 #flashinfo-div.player-error .player-error{
-                  display: block !important
                  }
 
                  #flash-div-top, #flash-div-bottom, #flashinfo-div{
@@ -726,9 +748,9 @@ function initflashm() {
 
   j.$('body').after(
     j.html(
-      `<div id="flash-div-top" style="text-align: center;pointer-events: none;position: fixed;top:-5px;width:100%;z-index: 2147483647;left: 0;"></div>\
-        <div id="flash-div-bottom" style="text-align: center;pointer-events: none;position: fixed;bottom:0px;width:100%;z-index: 2147483647;left: 0;"><div id="flash" style="display:none;  background-color: red;padding: 20px; margin: 0 auto;max-width: 60%;          -webkit-border-radius: 20px;-moz-border-radius: 20px;border-radius: 20px;background:rgba(227,0,0,0.6);"></div></div>\
-        <div id="flashinfo-div" class="${extraClass}" style="text-align: center;pointer-events: none;position: fixed;bottom:0px;width:100%;left: 0;">`,
+      `<div id="flash-div-top" dir="${api.storage.langDirection()}" style="text-align: center;pointer-events: none;position: fixed;top:-5px;width:100%;z-index: 2147483647;left: 0;"></div>\
+        <div id="flash-div-bottom" dir="${api.storage.langDirection()}" style="text-align: center;pointer-events: none;position: fixed;bottom:0px;width:100%;z-index: 2147483647;left: 0;"><div id="flash" style="display:none;  background-color: red;padding: 20px; margin: 0 auto;max-width: 60%;          -webkit-border-radius: 20px;-moz-border-radius: 20px;border-radius: 20px;background:rgba(227,0,0,0.6);"></div></div>\
+        <div id="flashinfo-div" dir="${api.storage.langDirection()}" class="${extraClass}" style="text-align: center;pointer-events: none;position: fixed;bottom:0px;width:100%;left: 0;">`,
     ),
   );
 }
@@ -753,7 +775,7 @@ export function lazyload(doc, scrollElement = '.mdl-layout__content') {
     } else {
       const img = new Image();
       const src = el.getAttribute('data-src');
-      img.onload = function() {
+      img.onload = function () {
         if (el.parent) el.parent.replaceChild(img, el);
         else el.src = src;
         // eslint-disable-next-line
@@ -769,7 +791,7 @@ export function lazyload(doc, scrollElement = '.mdl-layout__content') {
 
   lazyimages = [];
   const query = doc.find('img.lazy.init, .lazyBack.init');
-  const processScroll = function() {
+  const processScroll = function () {
     for (let i = 0; i < lazyimages.length; i++) {
       if (utils.elementInViewport(lazyimages[i], 600)) {
         // eslint-disable-next-line
@@ -792,7 +814,7 @@ export function lazyload(doc, scrollElement = '.mdl-layout__content') {
 
   if (!lazyloaded) {
     lazyloaded = true;
-    doc.find(scrollElement).scroll(function() {
+    doc.find(scrollElement).scroll(function () {
       processScroll();
     });
   }
@@ -815,41 +837,25 @@ export function wait(ms: number) {
   });
 }
 
-export function pageUrl(page: 'mal' | 'anilist' | 'kitsu' | 'simkl', type: 'anime' | 'manga', id: string | number) {
-  switch (page) {
-    case 'mal':
-      return `https://myanimelist.net/${type}/${id}`;
-    case 'anilist':
-      return `https://anilist.co/${type}/${id}`;
-    case 'kitsu':
-      return `https://kitsu.io/${type}/${id}`;
-    case 'simkl':
-      return `https://simkl.com/${type}/${id}`;
-    default:
-      throw `${page} not a valid page`;
-  }
-}
-
 export function returnYYYYMMDD(numFromToday = 0) {
   const d = new Date();
   d.setDate(d.getDate() + numFromToday);
-  const month = d.getMonth() < 9 ? `0${d.getMonth() + 1}` : d.getMonth() + 1;
-  const day = d.getDate() < 10 ? `0${d.getDate()}` : d.getDate();
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const day = d.getDate().toString().padStart(2, '0');
   return `${d.getFullYear()}-${month}-${day}`;
 }
 
 export function htmlDecode(text) {
-  return $('<textarea/>')
-    .html(j.html(text))
-    .text();
+  return $('<textarea/>').html(j.html(text)).text();
 }
 
 export function isFirefox(): boolean {
-  return Boolean(typeof browser !== 'undefined' && typeof chrome !== 'undefined');
+  return __IS_FIREFOX__;
 }
 
 export function waitForPageToBeVisible() {
-  const condition = () => Boolean(!document.visibilityState || document.visibilityState === 'visible');
+  const condition = () =>
+    Boolean(!document.visibilityState || document.visibilityState === 'visible');
 
   if (condition()) return Promise.resolve();
 
@@ -860,4 +866,35 @@ export function waitForPageToBeVisible() {
   return awaitUi().then(() => {
     con.log('Page is visible');
   });
+}
+
+export async function clearCache() {
+  const cacheObj = await api.storage.list();
+  let deleted = 0;
+
+  for (const key in cacheObj) {
+    if (!utils.syncRegex.test(key) && !/(^tagSettings\/.*)/.test(key)) {
+      api.storage.remove(key);
+      deleted++;
+    }
+  }
+
+  utils.flashm(`Cache Cleared [${deleted}]`);
+}
+
+export function sortAlphabetically(a, b) {
+  if (a.toLowerCase() < b.toLowerCase()) return -1;
+  if (a.toLowerCase() > b.toLowerCase()) return 1;
+  return 0;
+}
+
+export function isDomainMatching(url, domain) {
+  const urlObj = new URL(url);
+  const { host } = urlObj;
+  return host === domain || host.endsWith(`.${domain}`);
+}
+
+export function upperCaseFirstLetter(string) {
+  if (!string || string.length < 2) return string;
+  return string.charAt(0).toUpperCase() + string.slice(1);
 }

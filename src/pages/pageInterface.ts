@@ -1,4 +1,6 @@
-import { SyncPage } from './syncPage';
+import type { RuleSetType } from '../_provider/Search/rulesClass';
+import { mangaProgressConfig } from '../utils/mangaProgress/MangaProgress';
+import type { SyncPage } from '../pages-sync/syncPage';
 
 export interface pageInterface {
   domain: string | string[];
@@ -15,15 +17,26 @@ export interface pageInterface {
     getOverviewUrl: (url: string) => string; // Return a link to the Overview page.
     getEpisode: (url: string) => number; // Return the recognized episode or chapter number as integer.
     getVolume?: (url: string) => number; // (optional) Return the current volume number
+    getSeason?: (url: string) => number; // (optional) Return the current season number
+    getRuleSet?: (url: string) => RuleSetType; // (optional) Return the episode rule set the page uses, e.g. tvdb
+    getImage?: () => string | undefined; // Return an image for the entry for local sync
     nextEpUrl?: (url: string) => string | undefined; // (optional) return the link to the next episode. Used for links on the userlist
     uiSelector?: (selector: string) => void; // (optional) Inject a small ui with current status chapter... Only use this if there is no overview page
-    getMalUrl?: (provider: 'MAL' | 'ANILIST' | 'KITSU' | 'SIMKL') => Promise<string | false> | string | false; // (optional) Return the MALUrl. Only really needs to be implemented if the page provides that info.
+    getMalUrl?: (
+      provider: 'MAL' | 'ANILIST' | 'KITSU' | 'SIMKL' | 'SHIKI',
+    ) => Promise<string | false> | string | false; // (optional) Return the MALUrl. Only really needs to be implemented if the page provides that info.
+    readerConfig?: mangaProgressConfig[]; // (optional) Usd to get the current reading progress of a manga chapter
   };
   overview?: {
     getTitle: (url: string) => string;
     getIdentifier: (url: string) => string;
     uiSelector: (selector: string) => void;
-    getMalUrl?: (provider: 'MAL' | 'ANILIST' | 'KITSU' | 'SIMKL') => Promise<string | false> | string | false;
+    getSeason?: (url: string) => number; // (optional) Return the current season number
+    getRuleSet?: (url: string) => RuleSetType; // (optional) Return the episode rule set the page uses, e.g. tvdb
+    getImage?: () => string | undefined;
+    getMalUrl?: (
+      provider: 'MAL' | 'ANILIST' | 'KITSU' | 'SIMKL' | 'SHIKI',
+    ) => Promise<string | false> | string | false;
     list?: {
       // (optional) Used for recognizing the list of episodes/chapters on the overview page. Best is to ask for help on discord for this.
       offsetHandler: boolean;
@@ -45,5 +58,7 @@ export interface pageState {
   identifier: string;
   episode?: number;
   detectedEpisode?: number;
+  season?: number;
+  ruleSet?: RuleSetType;
   volume?: number;
 }

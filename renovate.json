@@ -1,6 +1,26 @@
 {
-  "extends": [
-    "config:base",
-    ":preserveSemverRanges"
-  ]
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:base", ":disableDependencyDashboard", "helpers:pinGitHubActionDigests"],
+  "automergeType": "branch",
+  "ignoreDeps": ["node"],
+  "packageRules": [
+    {
+      "matchPackagePatterns": ["eslint/*", "@types/*", "puppeteer/*", "vuejs/language-tools"],
+      "rangeStrategy": "bump",
+      "automerge": true
+    },
+    {
+      "matchPackagePatterns": ["*"],
+      "rangeStrategy": "bump"
+    }
+  ],
+  "npm": {
+     "rangeStrategy": "update-lockfile"
+  },
+  "minimumReleaseAge": "2 days",
+  "force": {
+    "constraints": {
+      "npm": "11.x"
+    }
+  }
 }

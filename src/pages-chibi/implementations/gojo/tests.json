@@ -1,0 +1,42 @@
+{
+  "title": "Gojo",
+  "url": "https://animetsu.net/",
+  "testCases": [
+    {
+      "url": "https://animetsu.net/watch/6989b9a929cf95f4eb03c1ed",
+      "expected": {
+        "sync": true,
+        "title": "No Game, No Life",
+        "identifier": "6989b9a929cf95f4eb03c1ed",
+        "overviewUrl": "https://animetsu.net/anime/6989b9a929cf95f4eb03c1ed",
+        "episode": 1,
+        "uiSelector": false
+      }
+    },
+    {
+      "url": "https://animetsu.net/watch/6989b9a929cf95f4eb03c1ed?ep=4",
+      "expected": {
+        "sync": true,
+        "title": "No Game, No Life",
+        "identifier": "6989b9a929cf95f4eb03c1ed",
+        "overviewUrl": "https://animetsu.net/anime/6989b9a929cf95f4eb03c1ed",
+        "episode": 4,
+        "uiSelector": false
+      }
+    },
+    {
+      "url": "https://animetsu.net/anime/6989b9a929cf95f4eb03c1ed",
+      "expected": {
+        "sync": false,
+        "title": "No Game, No Life",
+        "identifier": "6989b9a929cf95f4eb03c1ed",
+        "image": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/b19815-sEOQ9yQaPKlk.jpg",
+        "uiSelector": true,
+        "malUrl": "https://myanimelist.net/anime/6989b9a929cf95f4eb03c1ed",
+        "epList": {
+          "2": "https://animetsu.net/watch/6989b9a929cf95f4eb03c1ed?ep=2"
+        }
+      }
+    }
+  ]
+}

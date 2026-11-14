@@ -6,35 +6,39 @@ export const VIZ: pageInterface = {
   languages: ['English'],
   type: 'manga',
   isSyncPage(url) {
-    if (url.split('/')[3] === 'shonenjump' && url.split('/')[5] === 'chapter') {
+    if (
+      (url.split('/')[3] === 'shonenjump' || url.split('/')[3] === 'vizmanga') &&
+      url.split('/')[5] === 'chapter'
+    ) {
+      return true;
+    }
+    return false;
+  },
+  isOverviewPage(url) {
+    if (
+      (url.split('/')[3] === 'shonenjump' || url.split('/')[3] === 'vizmanga') &&
+      url.split('/')[4] === 'chapters'
+    ) {
       return true;
     }
     return false;
   },
   sync: {
     getTitle(url) {
-      return j.$('#product_row > div.bg-lighter-gray.mar-b-md.mar-b-lg--md.chapter_ribbon > div > h3 > a').text();
+      return j.$('div.chapter_ribbon > div > h3 > a').text();
     },
     getIdentifier(url) {
-      const anchorHref = j
-        .$('#product_row > div.bg-lighter-gray.mar-b-md.mar-b-lg--md.chapter_ribbon > div > h3 > a')
-        .attr('href');
+      const anchorHref = j.$('div.chapter_ribbon > div > h3 > a').attr('href');
 
       if (!anchorHref) return '';
 
       return anchorHref.split('/')[3];
     },
     getOverviewUrl(url) {
-      return (
-        VIZ.domain +
-        (j.$('#product_row > div.bg-lighter-gray.mar-b-md.mar-b-lg--md.chapter_ribbon > div > h3 > a').attr('href') ||
-          '')
-      );
+      return utils.absoluteLink(j.$('div.chapter_ribbon > div > h3 > a').attr('href'), VIZ.domain);
     },
     getEpisode(url) {
-      const episodePart = j
-        .$('#product_row > div.bg-lighter-gray.mar-b-md.mar-b-lg--md.chapter_ribbon > div > h3 > span')
-        .text();
+      const episodePart = j.$('div.chapter_ribbon > div > h3 > span').text();
 
       if (!episodePart) return NaN;
 
@@ -44,53 +48,60 @@ export const VIZ: pageInterface = {
 
       return Number(episodeNumberMatches[0]);
     },
+    nextEpUrl(url) {
+      const nextChapterHref = j.$('#end_page_next_up a[data-event*="Next Chapter"]').attr('href');
+
+      if (!nextChapterHref) return undefined;
+
+      // Viz renders the next chapter link as a `javascript:tryReadChapter(id, '/path')`
+      // pseudo-url, so extract the real path before resolving it. Otherwise the
+      // "Continue reading" button points to an unusable javascript: url (#2648).
+      const chapterPath = nextChapterHref.match(/tryReadChapter\(\d+,\s*'([^']+)'/i);
+
+      return utils.absoluteLink(chapterPath ? chapterPath[1] : nextChapterHref, VIZ.domain);
+    },
   },
   overview: {
     getTitle(url) {
-      return j
-        .$('#series-intro > div.clearfix.mar-t-md.mar-b-lg > h2')
-        .text()
-        .trim();
+      return j.$('#series-intro > div > h2').text().trim();
     },
     getIdentifier(url) {
       return url.split('/')[5];
     },
     uiSelector(selector) {
-      j.$('#series-intro')
-        .first()
-        .after(j.html(selector));
+      j.$('#series-intro').first().after(j.html(selector));
     },
     list: {
       offsetHandler: false,
       elementsSelector() {
-        return j.$('.o_sortable-b,.o_sortable');
+        return j.$(
+          '.section_chapters #chpt_rows .o_sortable-b, .section_chapters #chpt_rows .o_sortable',
+        );
       },
       elementUrl(selector) {
-        const anchorHref = selector
-          .find('a')
-          .first()
-          .attr('href');
+        const anchorHref = selector.find('a').first().attr('href');
 
         if (!anchorHref) return '';
 
-        return VIZ.domain + anchorHref.replace(/javascript:tryReadChapter\(\d+,'/gi, '').replace(/'\);/g, '');
+        return utils.absoluteLink(
+          anchorHref.replace(/javascript:tryReadChapter\(\d+,'/gi, '').replace(/'\);/g, ''),
+          VIZ.domain,
+        );
       },
       elementEp(selector) {
-        const anchorHref = selector
-          .find('a')
-          .first()
-          .attr('href');
+        const anchorHref = selector.find('a').first().attr('href');
 
-        if (!anchorHref || anchorHref.match(/javascript:void\('join to read'\);/)) return NaN;
+        if (
+          !anchorHref ||
+          /javascript:void\('join to read'\);/.test(anchorHref) ||
+          anchorHref.includes('/read/manga/')
+        )
+          return NaN;
 
-        let episodePart = selector.find('td > div.disp-id.mar-r-sm').text();
+        let episodePart = selector.find('td.ch-num-list-spacing > div').text();
 
         if (episodePart.length === 0) {
-          episodePart = selector
-            .find('a')
-            .first()
-            .text()
-            .trim();
+          episodePart = selector.find('a').first().text().trim();
         }
 
         if (!episodePart || episodePart.length === 0) throw 'Join to read';
@@ -104,14 +115,11 @@ export const VIZ: pageInterface = {
     },
   },
   init(page) {
-    api.storage.addStyle(require('!to-string-loader!css-loader!less-loader!./style.less').toString());
-    j.$(document).ready(function() {
-      if (
-        page.url.split('/')[3] === 'shonenjump' &&
-        (page.url.split('/')[5] === 'chapter' || page.url.split('/')[4] === 'chapters')
-      ) {
-        page.handlePage();
-      }
+    api.storage.addStyle(
+      require('!to-string-loader!css-loader!less-loader!./style.less').toString(),
+    );
+    j.$(document).ready(function () {
+      page.handlePage();
     });
   },
 };

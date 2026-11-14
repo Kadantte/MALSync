@@ -1,8 +1,5 @@
 import { MyAnimeListClass } from '../myanimelist/myanimelistClass';
 import { firebaseNotification } from '../utils/firebaseNotification';
-import { initShark } from '../utils/shark';
-
-initShark();
 
 let lastFocus;
 
@@ -13,7 +10,7 @@ function main() {
   mal.init();
   firebaseNotification();
 
-  $(window).blur(function() {
+  $(window).blur(function () {
     lastFocus = Date.now();
   });
 }
@@ -26,14 +23,18 @@ api.settings.init().then(() => {
   main();
 });
 
-function messageMalListener(mal) {
+function messageMalListener(mal: MyAnimeListClass) {
   const logger = con.m('TabMalUrl');
   // @ts-ignore
-  chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
+  chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
     if (Date.now() - lastFocus < 3 * 1000) {
       if (msg.action === 'TabMalUrl') {
         logger.log('Response', mal.url);
-        sendResponse(mal.url);
+        sendResponse({
+          url: mal.url,
+          title: mal.getTitle(),
+          image: mal.getImage(),
+        });
       }
       return;
     }

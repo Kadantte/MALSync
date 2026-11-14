@@ -1,18 +1,22 @@
 import { NotAutenticatedError } from '../Errors';
 import { ListAbstract, listElement } from '../listAbstract';
+import { buildProviderUrl } from '../../utils/slugs';
 import * as helper from './helper';
+import * as definitions from '../definitions';
 
 export class UserList extends ListAbstract {
   name = 'Simkl';
 
-  authenticationUrl =
-    'https://simkl.com/oauth/authorize?response_type=code&client_id=39e8640b6f1a60aaf60f3f3313475e830517badab8048a4e52ff2d10deb2b9b0&redirect_uri=https://simkl.com/apps/chrome/mal-sync/connected/';
+  authenticationUrl = helper.getAuthUrl();
 
-  async getUsername() {
+  async getUserObject() {
     return this.call('https://api.simkl.com/users/settings').then(res => {
-      con.log(res);
       if (res && res.user && typeof res.user.name !== 'undefined') {
-        return res.user.name;
+        return {
+          username: res.user.name,
+          picture: res.user.avatar || '',
+          href: `https://simkl.com/${res.account.id}`,
+        };
       }
 
       throw new NotAutenticatedError('Not Authenticated');
@@ -45,12 +49,14 @@ export class UserList extends ListAbstract {
     for (let i = 0; i < data.length; i++) {
       const el = data[i];
       const st = this.translateList(el.status);
-      if (status !== 7 && parseInt(st) !== status) {
+      if (status !== definitions.status.All && parseInt(st) !== status) {
         continue;
       }
 
       let curep = this.getEpisode(el.last_watched);
-      if (st === 2) curep = el.total_episodes_count;
+      if (st === definitions.status.Completed) {
+        curep = el.total_episodes_count;
+      }
 
       if (listType === 'anime') {
         const tempData = await this.fn({
@@ -60,12 +66,14 @@ export class UserList extends ListAbstract {
           cacheKey: this.getCacheKey(el.show.ids.mal, el.show.ids.simkl),
           type: listType,
           title: el.show.title,
-          url: `https://simkl.com/${listType}/${el.show.ids.simkl}`,
+          url: buildProviderUrl('SIMKL', listType, el.show.ids.simkl),
+          score: el.user_rating ? el.user_rating : 0,
           watchedEp: curep,
           totalEp: el.total_episodes_count,
           status: st,
-          score: el.user_rating ? el.user_rating : 0,
           image: `https://simkl.in/posters/${el.show.poster}_ca.jpg`,
+          imageLarge: `https://simkl.in/posters/${el.show.poster}_m.jpg`,
+          imageBanner: `https://simkl.in/posters/${el.show.poster}_w.jpg`,
           tags: el.private_memo,
           airingState: el.anime_airing_status,
         });

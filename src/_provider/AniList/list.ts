@@ -1,5 +1,6 @@
 import { ListAbstract, listElement } from '../listAbstract';
 import * as helper from './helper';
+import * as definitions from '../definitions';
 
 export class UserList extends ListAbstract {
   name = 'AniList';
@@ -8,14 +9,18 @@ export class UserList extends ListAbstract {
 
   public seperateRewatching = true;
 
-  authenticationUrl = 'https://anilist.co/api/v2/oauth/authorize?client_id=1487&response_type=token';
+  authenticationUrl =
+    'https://anilist.co/api/v2/oauth/authorize?client_id=1487&response_type=token';
 
-  getUsername() {
+  getUserObject() {
     const query = `
     query {
       Viewer {
         name
         id
+        avatar {
+          large
+        }
         options {
           displayAdultContent
         }
@@ -33,7 +38,11 @@ export class UserList extends ListAbstract {
         opt.scoreFormat = res.data.Viewer.mediaListOptions.scoreFormat;
         api.settings.set('anilistOptions', opt);
       }
-      return res.data.Viewer.name;
+      return {
+        username: res.data.Viewer.name,
+        picture: res.data.Viewer.avatar.large || '',
+        href: `https://anilist.co/user/${res.data.Viewer.id}`,
+      };
     });
   }
 
@@ -49,18 +58,18 @@ export class UserList extends ListAbstract {
     return [
       {
         icon: 'sort_by_alpha',
-        title: 'Alphabetic',
+        title: api.storage.lang('list_sorting_alpha'),
         value: 'alpha',
       },
       {
         icon: 'history',
-        title: 'Last Updated',
+        title: api.storage.lang('list_sorting_history'),
         value: 'updated',
         asc: true,
       },
       {
         icon: 'score',
-        title: 'Score',
+        title: api.storage.lang('list_sorting_score'),
         value: 'score',
         asc: true,
       },
@@ -80,16 +89,22 @@ export class UserList extends ListAbstract {
       case 'score_asc':
         return 'SCORE';
       default:
-        if (this.status === 1) return this.getOrder('updated');
-        if (this.status === 6) return this.getOrder('updated');
-        return this.getOrder('updated'); // TODO: remove when fixed in anilist
+        if (this.status === definitions.status.Watching) return this.getOrder('updated');
+        if (this.status === definitions.status.PlanToWatch) return this.getOrder('updated');
+        // TODO: remove when fixed in anilist
+        return this.getOrder('updated');
         return this.getOrder('alpha');
     }
   }
 
   async getPart(): Promise<any> {
     if (this.offset < 1) this.offset = 1;
-    con.log('[UserList][AniList]', `username: ${this.username}`, `status: ${this.status}`, `offset: ${this.offset}`);
+    con.log(
+      '[UserList][AniList]',
+      `username: ${this.username}`,
+      `status: ${this.status}`,
+      `offset: ${this.offset}`,
+    );
 
     if (!this.username) {
       this.username = await this.getUsername();
@@ -103,6 +118,17 @@ export class UserList extends ListAbstract {
         }
         mediaList (status: $status, type: $type, userName: $userName, sort: $sort) {
           status
+          startedAt {
+            year
+            month
+            day
+          }
+          completedAt {
+            year
+            month
+            day
+          }
+          repeat
           score(format: POINT_100)
           progress
           progressVolumes
@@ -118,7 +144,9 @@ export class UserList extends ListAbstract {
             averageScore
             coverImage{
               large
+              extraLarge
             }
+            bannerImage
             title {
               userPreferred
             }
@@ -187,11 +215,16 @@ export class UserList extends ListAbstract {
           type: listType,
           title: el.media.title.userPreferred,
           url: el.media.siteUrl,
+          score: Math.round(el.score / 10),
           watchedEp: el.progress,
           totalEp: el.media.episodes,
           status: helper.translateList(el.status),
-          score: Math.round(el.score / 10),
-          image: el.media.coverImage.large,
+          startDate: helper.parseFuzzyDate(el.startedAt),
+          finishDate: helper.parseFuzzyDate(el.completedAt),
+          rewatchCount: el.repeat,
+          image: helper.imgCheck(el.media.coverImage.large),
+          imageLarge: helper.imgCheck(el.media.coverImage.extraLarge),
+          imageBanner: helper.imgCheck(el.media.bannerImage),
           tags: el.notes,
           airingState: el.anime_airing_status,
         });
@@ -204,11 +237,18 @@ export class UserList extends ListAbstract {
           type: listType,
           title: el.media.title.userPreferred,
           url: el.media.siteUrl,
-          watchedEp: el.progress,
-          totalEp: el.media.chapters,
-          status: helper.translateList(el.status),
           score: Math.round(el.score / 10),
-          image: el.media.coverImage.large,
+          watchedEp: el.progress,
+          readVol: el.progressVolumes,
+          totalEp: el.media.chapters,
+          totalVol: el.media.volumes,
+          status: helper.translateList(el.status),
+          startDate: helper.parseFuzzyDate(el.startedAt),
+          finishDate: helper.parseFuzzyDate(el.completedAt),
+          rewatchCount: el.repeat,
+          image: helper.imgCheck(el.media.coverImage.large),
+          imageLarge: helper.imgCheck(el.media.coverImage.extraLarge),
+          imageBanner: helper.imgCheck(el.media.bannerImage),
           tags: el.notes,
           airingState: el.anime_airing_status,
         });

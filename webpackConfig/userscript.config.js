@@ -1,28 +1,39 @@
 const path = require('path');
+const fs = require('fs');
 const webpack = require('webpack');
 const wrapper = require('./utils/WrapperPlugin');
+const { getVirtualScript } = require('./utils/general');
 const package = require('../package.json');
 const generalUrls = require('./utils/pageUrls');
 const pages = require('./utils/pages').pagesUrls();
 const playerUrls = require('../src/pages/playerUrls');
 const resourcesJson = require('./resourcesUserscript');
 const httpPermissionsJson = require('./httpPermissions.json');
-const VueLoaderPlugin = require('vue-loader/lib/plugin');
+const { VueLoaderPlugin } = require('vue-loader');
+const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
 const i18n = require('./utils/i18n');
+const pagesUtils = require('./utils/pages');
+const generateMatchExcludes = pagesUtils.generateMatchExcludes;
 
 const pageUrls = { ...generalUrls, ...pages };
+const { getKeys } = require('./utils/keys');
 
-const generateMatchExcludes = urls => {
-  let match = [];
-  let exclude = [];
-  for (const key in urls) {
-    const el = urls[key];
-    if (typeof el.match !== 'undefined') match = match.concat(el.match);
-    if (typeof el.exclude !== 'undefined') exclude = exclude.concat(el.exclude);
-  }
-  return { match: match, exclude: exclude };
-};
+let chibiUrls = [];
+try {
+  const chibiList = require('../dist/webextension/chibi/list.json');
+  const chibiAdultList = require('../dist/adult/chibi/list.json');
+  const chibiPages = [...Object.values(chibiList.pages), ...Object.values(chibiAdultList.pages)];
+  chibiUrls = chibiPages.map(chibi => {
+    return [
+      ...chibi.urls.match,
+      ...(chibi.urls.player ? Object.values(chibi.urls.player).flat() : []),
+    ];
+  });
+} catch (e) {
+  console.log(e);
+  throw 'Chibi list not found. Please build the extension first. `npm run build:webextension`';
+}
 
 const generateResources = () => {
   const resources = [];
@@ -51,14 +62,15 @@ const metadata = {
     'GM_listValues',
     'GM_addStyle',
     'GM_getResourceText',
+    'GM_getResourceURL',
     'GM_notification',
     'GM.xmlHttpRequest',
     'GM.getValue',
     'GM.setValue',
   ],
-  match: generateMatchExcludes(pageUrls).match.concat(generateMatchExcludes(playerUrls).match),
+  match: generateMatchExcludes(pageUrls).match.concat(generateMatchExcludes(playerUrls).match).concat(chibiUrls.flat()),
   exclude: generateMatchExcludes(pageUrls).exclude,
-  'require ': 'http://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js',
+  'require': 'https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js#sha256-o88AwQnZB+VDvE9tvIXrMQaPlFFSUTR+nldQm1LuPXQ=',
   resource: generateResources(),
   'run-at': 'document_start',
   connect: [
@@ -88,6 +100,25 @@ const generateMetadataBlock = metadata => {
   return `// ==UserScript==\n${block}// ==/UserScript==\n\n` + `var i18n = ${JSON.stringify(i18n())};\n`;
 };
 
+const proxyScriptRequest = scriptPath =>
+  JSON.stringify(`${path.resolve(__dirname, '..', scriptPath).replace(/\\/g, '/')}?raw`);
+
+const proxyScripts = [
+  `export const proxy_request = require(${proxyScriptRequest(
+    'dist/webextension/content/proxy/proxy_request.js',
+  )});`,
+];
+pagesUtils.pages().forEach(page => {
+  pageRoot = path.join(__dirname, '..', 'src/pages/', page);
+  const scriptPath = `dist/webextension/content/proxy/proxy_${page}.js`;
+  if (fs.existsSync(path.join(pageRoot, 'proxy.ts'))) {
+    if (!fs.existsSync(path.join(__dirname, '..', scriptPath)))
+      throw new Error(`Proxy script for ${page} does not exist. Please build the extension first.`);
+    proxyScripts.push(`export const ${page} = require(${proxyScriptRequest(scriptPath)});`);
+  }
+});
+console.log('Proxy', proxyScripts);
+
 module.exports = {
   entry: {
     index: path.join(__dirname, '..', 'src/index.ts'),
@@ -105,22 +136,33 @@ module.exports = {
       {
         test: /\.less$/,
         exclude: /node_modules/,
-        use: ['vue-style-loader', { loader: 'to-string-loader' }, { loader: 'css-loader' }, { loader: 'less-loader' }],
+        use: ['style-loader', 'css-loader', 'less-loader'],
       },
       {
         test: /\.vue$/,
         exclude: /node_modules/,
         loader: 'vue-loader',
         options: {
+          customElement: true,
           shadowMode: true,
+          exposeFilename: true,
         },
+      },
+      {
+        resourceQuery: /raw/,
+        type: 'asset/source',
       },
     ],
   },
   resolve: {
     extensions: ['.tsx', '.ts', '.js', '.less', '.vue'],
     alias: {
-      vue$: 'vue/dist/vue.esm.js',
+      vue: '@vue/runtime-dom',
+    },
+  },
+  resolveLoader: {
+    alias: {
+      'to-string-loader': require.resolve('./utils/toStringLoader'),
     },
   },
   output: {
@@ -128,17 +170,30 @@ module.exports = {
     path: path.resolve(__dirname, '..', 'dist'),
   },
   plugins: [
+    new ForkTsCheckerWebpackPlugin({
+      typescript: {
+        configFile: path.resolve(__dirname, '../tsconfig.json'),
+        extensions: {
+          vue: {
+            enabled: true,
+            compiler: '@vue/compiler-sfc',
+          },
+        },
+      },
+    }),
     new VueLoaderPlugin(),
     new webpack.ProvidePlugin({
       con: path.resolve(__dirname, './../src/utils/console'),
       utils: path.resolve(__dirname, './../src/utils/general'),
       j: path.resolve(__dirname, './../src/utils/j'),
       api: path.resolve(__dirname, './../src/api/userscript'),
+      proxyScripts: getVirtualScript('proxyScripts', proxyScripts.join('\n')),
     }),
     new webpack.DefinePlugin({
-      env: JSON.stringify({
-        CONTEXT: process.env.MODE === 'travis' ? 'production' : 'development',
-      }),
+      __VUE_OPTIONS_API__: true,
+      __VUE_PROD_DEVTOOLS__: false,
+      __MAL_SYNC_KEYS__: JSON.stringify(getKeys()),
+      __IS_FIREFOX__: false,
     }),
     new webpack.optimize.LimitChunkCountPlugin({
       maxChunks: 1,

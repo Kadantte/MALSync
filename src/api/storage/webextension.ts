@@ -7,7 +7,7 @@ export const webextension: storageInterface = {
     const obj = {} as any;
     obj[key] = value;
     return new Promise((resolve, reject) => {
-      getStorage(key).set(obj, function() {
+      getStorage(key).set(obj, function () {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError);
           return;
@@ -19,7 +19,7 @@ export const webextension: storageInterface = {
 
   async get(key: string): Promise<any> {
     return new Promise((resolve, reject) => {
-      getStorage(key).get(key, function(results) {
+      getStorage(key).get(key, function (results) {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError);
           return;
@@ -31,7 +31,7 @@ export const webextension: storageInterface = {
 
   async remove(key: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      getStorage(key).remove(key, function() {
+      getStorage(key).remove(key, function () {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError);
           return;
@@ -41,14 +41,14 @@ export const webextension: storageInterface = {
     });
   },
 
-  async list(type = 'local'): Promise<any> {
+  async list(type = 'local'): Promise<{ [key: string]: any }> {
     return new Promise((resolve, reject) => {
       if (type === 'local') {
-        chrome.storage.local.get(null, function(results) {
+        chrome.storage.local.get(null, function (results) {
           resolve(results);
         });
       } else {
-        chrome.storage.sync.get(null, function(results) {
+        chrome.storage.sync.get(null, function (results) {
           resolve(results);
         });
       }
@@ -83,8 +83,20 @@ export const webextension: storageInterface = {
     return chrome.i18n.getMessage(selector, args);
   },
 
+  langDirection() {
+    try {
+      const lang = chrome.i18n.getUILanguage();
+      if (/^(ar)(-|$)/i.test(lang) && !api.settings.get('forceEn')) {
+        return 'rtl';
+      }
+    } catch (error) {
+      con.error(error);
+    }
+    return 'ltr';
+  },
+
   assetUrl(filename) {
-    return chrome.extension.getURL(`assets/${filename}`);
+    return chrome.runtime.getURL(`assets/${filename}`);
   },
 
   injectCssResource(res, head) {
@@ -93,12 +105,17 @@ export const webextension: storageInterface = {
 
   injectjsResource(res, head) {
     const s = document.createElement('script');
-    s.src = chrome.extension.getURL(`vendor/${res}`);
-    s.onload = function() {
+    s.src = chrome.runtime.getURL(`vendor/${res}`);
+    s.onload = function () {
       // @ts-ignore
       this.remove();
     };
     head.get(0).appendChild(s);
+  },
+
+  addProxyScriptToTag(tag, name) {
+    tag.src = chrome.runtime.getURL(`/content/proxy/proxy_${name}.js`);
+    return tag;
   },
 
   updateDom(head) {
@@ -114,7 +131,7 @@ export const webextension: storageInterface = {
             },500);
           }
         }`;
-    s.onload = function() {
+    s.onload = function () {
       // @ts-ignore
       this.remove();
     };

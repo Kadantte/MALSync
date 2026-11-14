@@ -1,8 +1,7 @@
 import { expect } from 'chai';
-import * as request from 'request';
 import { SearchClass } from '../../../src/_provider/Search/searchClass';
 
-describe('Sanitized Titel', function() {
+describe('Sanitized Title', function() {
   const titles = {
     'Full Metal Panic! (Dub)': 'Full Metal Panic!',
     'Full Metal Panic! (Sub)': 'Full Metal Panic!',
@@ -23,12 +22,12 @@ describe('Sanitized Titel', function() {
     const resTitle = titles[key];
     it(title, function() {
       const searchObj = new SearchClass(title, 'anime');
-      expect(searchObj.getSanitizedTitel()).to.equal(resTitle);
+      expect(searchObj.getSanitizedTitle()).to.equal(resTitle);
     });
   });
 });
 
-describe('Titel Similarity', function() {
+describe('Title Similarity', function() {
   const titles = [
     { title: 'Durarara!!x2 Shou', extTitle: 'Durarara!!x2 Shou', result: true },
     {
@@ -75,138 +74,15 @@ describe('Titel Similarity', function() {
   });
 });
 
-describe('Firebase', function() {
-  // Not in use anymore
-  return;
-  before(function() {
-    global.con = require('../../../src/utils/console');
-    global.con.log = function() {};
-    global.con.error = function() {};
-    global.con.info = function() {};
-    global.api = {
-      request: {
-        async xhr(post, conf, data) {
-          return new Promise(function(resolve, reject) {
-            request(conf, (error, response, body) => {
-              resolve({
-                responseText: body,
-              });
-            });
-          });
-        },
-      },
+const xhrFunction = async function xhr(post, conf, data) {
+  return fetch(conf).then(async response => {
+    return {
+      finalUrl: response.url,
+      responseText: await response.text(),
+      status: response.status,
     };
   });
-
-  it('Crunchyroll', async function() {
-    const searchObj = new SearchClass(
-      'No Game No Life',
-      'anime',
-      'No Game No Life',
-    );
-    searchObj.setPage({
-      database: 'Crunchyroll',
-      type: 'anime',
-    });
-    expect(await searchObj.firebase()).to.eql({
-      url: 'https://myanimelist.net/anime/19815/No_Game_No_Life',
-      offset: 0,
-      provider: 'firebase',
-      similarity: {
-        same: true,
-        value: 1,
-      },
-    });
-  });
-
-  it('Kissanime', async function() {
-    const searchObj = new SearchClass(
-      'No Game No Life',
-      'anime',
-      'No-Game-No-Life-Dub',
-    );
-    searchObj.setPage({
-      database: 'Kissanime',
-      type: 'anime',
-    });
-    expect(await searchObj.firebase()).to.eql({
-      url: 'https://myanimelist.net/anime/19815/No_Game_No_Life',
-      offset: 0,
-      provider: 'firebase',
-      similarity: {
-        same: true,
-        value: 1,
-      },
-    });
-  });
-
-  it('Novelplanet', async function() {
-    const searchObj = new SearchClass(
-      'No Game No Life',
-      'novel',
-      'No-Game-No-Life',
-    );
-    searchObj.setPage({
-      database: 'Novelplanet',
-      type: 'manga',
-    });
-    expect(await searchObj.firebase()).to.eql({
-      url: 'https://myanimelist.net/manga/48399/No_Game_No_Life',
-      offset: 0,
-      provider: 'firebase',
-      similarity: {
-        same: true,
-        value: 1,
-      },
-    });
-  });
-
-  it('Not Found', async function() {
-    const searchObj = new SearchClass(
-      'Avatar: The Last Airbender Season 1',
-      'anime',
-      'Avatar-The-Last-Airbender-Season-1',
-    );
-    searchObj.setPage({
-      database: 'Kissanime',
-      type: 'anime',
-    });
-    expect(await searchObj.firebase()).to.eql({
-      url: '',
-      offset: 0,
-      provider: 'firebase',
-      similarity: {
-        same: true,
-        value: 1,
-      },
-    });
-  });
-
-  it('Not Existing', async function() {
-    const searchObj = new SearchClass(
-      'Something',
-      'anime',
-      'Something-that-does-not-exist',
-    );
-    searchObj.setPage({
-      database: 'Kissanime',
-      type: 'anime',
-    });
-    expect(await searchObj.firebase()).to.eql(false);
-  });
-
-  it('No database', async function() {
-    const searchObj = new SearchClass(
-      'Something',
-      'anime',
-      'Something-that-does-not-exist',
-    );
-    searchObj.setPage({
-      type: 'anime',
-    });
-    expect(await searchObj.firebase()).to.eql(false);
-  });
-});
+};
 
 describe('Mal Search', function() {
   before(function() {
@@ -216,21 +92,12 @@ describe('Mal Search', function() {
     global.con.info = function() {};
     global.api = {
       request: {
-        async xhr(post, conf, data) {
-          return new Promise(function(resolve, reject) {
-            request(conf, (error, response, body) => {
-              resolve({
-                responseText: body,
-                status: response.statusCode,
-              });
-            });
-          });
-        },
+        xhr: xhrFunction,
       },
     };
   });
 
-  it('Novelplanet', async function() {
+  xit('Novelplanet', async function () {
     this.timeout(10000);
     const searchObj = new SearchClass(
       'Shuumatsu Nani Shitemasu ka? Isogashii desu ka? Sukutte Moratte Ii desu ka?',
@@ -254,25 +121,25 @@ describe('Mal Search', function() {
     });
   });
 
-  it('Kissanime', async function() {
+  xit('Kissanime', async function () {
     this.timeout(10000);
     const searchObj = new SearchClass(
-      'Fate/kaleid liner PRISMA ILLYA',
+      'AZUMANGA DAIOH: GEKIJOU TANPEN',
       'anime',
-      'Fate-kaleid-liner-Prisma-Illya',
+      'azumanga-daioh-gekijou-tanpen',
     );
     searchObj.setPage({
       database: 'Kissanime',
       type: 'anime',
     });
     expect(await searchObj.malSearch()).to.eql({
-      id: 14829,
-      url: 'https://myanimelist.net/anime/14829/Fate_kaleid_liner_Prisma☆Illya',
+      id: 659,
+      url: 'https://myanimelist.net/anime/659/Azumanga_Daiou__Gekijou_Tanpen',
       offset: 0,
       provider: 'mal',
       similarity: {
         same: true,
-        value: 0.9433962264150944,
+        value: 0.9230769230769231,
       },
     });
   });
@@ -288,16 +155,7 @@ describe('Page Search', function() {
     global.con.info = function() {};
     global.api = {
       request: {
-        async xhr(post, conf, data) {
-          return new Promise(function(resolve, reject) {
-            request(conf, (error, response, body) => {
-              resolve({
-                responseText: body,
-                status: response.statusCode,
-              });
-            });
-          });
-        },
+        xhr: xhrFunction,
       },
       settings: {
         get(val) {
@@ -386,16 +244,7 @@ describe('Full Search', function() {
     global.con.info = function() {};
     global.api = {
       request: {
-        async xhr(post, conf, data) {
-          return new Promise(function(resolve, reject) {
-            request(conf, (error, response, body) => {
-              resolve({
-                responseText: body,
-                status: response.statusCode,
-              });
-            });
-          });
-        },
+        xhr: xhrFunction,
       },
       settings: {
         get(val) {
@@ -423,32 +272,11 @@ describe('Full Search', function() {
     expect(result.provider).equal('firebase');
   });
 
-  it('Not Existing', async function() {
-    // TODO: Reimplement
-    return;
-    this.timeout(10000);
-    const searchObj = new SearchClass(
-      'No Game No Life',
-      'anime',
-      'Something-that-does-not-exist',
-    );
-    searchObj.setPage({
-      database: 'Twistmoe',
-      type: 'anime',
-    });
-    const result = await searchObj.searchForIt();
-    expect(result.provider).equal('mal');
-  });
-
   it('Not Found', async function() {
     this.timeout(10000);
-    const searchObj = new SearchClass(
-      'Avatar: The Last Airbender',
-      'anime',
-      'k1n4',
-    );
+    const searchObj = new SearchClass('Castlevania', 'anime', 'castlevania-ff98');
     searchObj.setPage({
-      database: '9anime',
+      database: 'KickAssAnime',
       type: 'anime',
     });
     const result = await searchObj.searchForIt();

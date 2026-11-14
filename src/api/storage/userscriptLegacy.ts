@@ -25,7 +25,7 @@ export const userscriptLegacy: storageInterface = {
 
   async list(): Promise<any[]> {
     const reverseArray: any = {};
-    j.$.each(GM_listValues(), function(index, cache) {
+    j.$.each(GM_listValues(), function (index, cache) {
       reverseArray[cache] = index;
     });
     return reverseArray;
@@ -49,11 +49,15 @@ export const userscriptLegacy: storageInterface = {
     return message;
   },
 
+  langDirection() {
+    return 'ltr';
+  },
+
   assetUrl(filename) {
     return `https://raw.githubusercontent.com/MALSync/MALSync/master/assets/assets/${filename}`;
   },
 
-  injectCssResource(res, head) {
+  injectCssResource(res, head, code = null) {
     // eslint-disable-next-line jquery-unsafe-malsync/no-xss-jquery
     head.append(
       // eslint-disable-next-line jquery-unsafe-malsync/no-xss-jquery
@@ -61,18 +65,26 @@ export const userscriptLegacy: storageInterface = {
         .$('<style>')
         .attr('rel', 'stylesheet')
         .attr('type', 'text/css')
-        .html(GM_getResourceText(res)),
+        .html(code || GM_getResourceText(res)),
     );
   },
 
   injectjsResource(res, head) {
     const s = document.createElement('script');
     s.text = GM_getResourceText(res);
-    s.onload = function() {
+    s.onload = function () {
       // @ts-ignore
       this.remove();
     };
     head.get(0).appendChild(s);
+  },
+
+  addProxyScriptToTag(tag, name) {
+    // @ts-ignore
+    const ps: { [key: string]: string } = proxyScripts;
+    if (!ps[name]) throw new Error(`Proxy script ${name} not found`);
+    tag.textContent = ps[name];
+    return tag;
   },
 
   updateDom(head) {
@@ -88,7 +100,7 @@ export const userscriptLegacy: storageInterface = {
             },500);
           }
         }`;
-    s.onload = function() {
+    s.onload = function () {
       // @ts-ignore
       this.remove();
     };

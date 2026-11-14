@@ -1,25 +1,32 @@
-// eslint-disable-next-line import/no-unresolved
-const quicklinks = require('./quicklinks.json');
+const quicklinkPages = require('./quicklinks.json') as QuicklinkObject[];
+
+type QuicklinkGroup = 'home' | 'search' | 'link';
+
+export interface QuicklinkObjectSearch {
+  anime: string | null;
+  manga: string | null;
+}
+
+interface QuicklinkObject {
+  key: string;
+  name: string;
+  domain: string;
+  database: string | null;
+  search: QuicklinkObjectSearch;
+}
 
 interface Links {
   name: string;
   url: string;
+  fn?: (searchTerm: string) => string;
 }
 
 export interface Quicklink {
   name: string;
   domain: string;
+  group: QuicklinkGroup;
   links: Links[];
 }
-
-/*
-  {searchterm} => 'no%20game%20no%20life'
-  {searchtermPlus} => 'no+game+no+life'
-  {searchtermMinus} => 'no-game-no-life'
-  {searchtermUnderscore} => 'no_game_no_life'
-  {searchtermRaw} => 'no game no life'
-  {cacheId} => '143'
-*/
 
 export function titleSearch(url, title, id) {
   return searchSyntax(
@@ -33,18 +40,28 @@ export function titleSearch(url, title, id) {
   );
 }
 
-/*
-  {searchterm(<whitespaceReplacement>)[<options>]}
-  Options:
-    noEncode -> Dont encode characters
-    noSpecial -> Remove special characters
-    noLowercase -> Dont lowercase everything
-*/
+type option = 'noEncode' | 'noSpecial' | 'noLowercase' | 'specialReplace';
 
-type option = 'noEncode' | 'noSpecial' | 'noLowercase';
-
+/**
+ * @example
+ * Simple usage:
+ *  {searchterm} => 'no%20game%20no%20life'
+ *  {searchtermPlus} => 'no+game+no+life'
+ *  {searchtermMinus} => 'no-game-no-life'
+ *  {searchtermUnderscore} => 'no_game_no_life'
+ *  {searchtermRaw} => 'no game no life'
+ *  {cacheId} => '143'
+ *
+ * Advanced usage:
+ *  {searchterm(<whitespaceReplacement>)[<options>]}
+ *  Options:
+ *    noEncode -> Dont encode characters
+ *    noSpecial -> Remove special characters
+ *    specialReplace -> Replace special characters with a <whitespaceReplacement>
+ *    noLowercase -> Dont lowercase everything
+ */
 export function searchSyntax(url, title) {
-  let resTitle = title.trim();
+  let resTitle = title.replace(/^\[l\]/i, '').trim();
   let options: option[] = [];
 
   const found = url.match(/{searchterm(\(.\))?(\[[^[\]]*\])?}/);
@@ -64,6 +81,11 @@ export function searchSyntax(url, title) {
   if (options.includes('noSpecial')) {
     resTitle = resTitle
       .replace(/[^a-zA-Z\d ]/g, '')
+      .replace(/ +/g, ' ')
+      .trim();
+  } else if (options.includes('specialReplace')) {
+    resTitle = resTitle
+      .replace(/[^a-zA-Z\d ]/g, ' ')
       .replace(/ +/g, ' ')
       .trim();
   }
@@ -92,13 +114,15 @@ async function fillFromApi(combined, type, id) {
   });
 }
 
-function simplifyObject(combined, type, searchterm, id): Quicklink[] {
+function simplifyObject(combined, type, title, id): Quicklink[] {
   return combined
-    .filter(el => el.search && el.search[type])
+    .filter(el => (el.search && el.search[type]) || el.databaseLinks)
     .map(el => {
       const links: Links[] = [];
+      let quickGroup: QuicklinkGroup;
 
       if (el.databaseLinks) {
+        quickGroup = 'link';
         Object.values(el.databaseLinks).forEach((db: any) => {
           links.push({
             name: db.title,
@@ -106,20 +130,24 @@ function simplifyObject(combined, type, searchterm, id): Quicklink[] {
           });
         });
       } else if (el.search[type] === 'home') {
+        quickGroup = 'home';
         links.push({
           name: 'Homepage',
           url: el.domain,
         });
       } else {
+        quickGroup = 'search';
         links.push({
           name: 'Quicksearch',
-          url: titleSearch(el.search[type], searchterm, id),
+          url: titleSearch(el.search[type], title, id),
+          fn: searchTerm => titleSearch(el.search[type], searchTerm, id),
         });
       }
 
       return {
         name: el.name,
         domain: el.domain,
+        group: quickGroup,
         links,
       };
     });
@@ -141,6 +169,38 @@ export async function getMalToKissApi(type, id) {
   });
 }
 
+let tempQuicklinks = null as QuicklinkObject[] | null;
+export function getQuicklinks(): QuicklinkObject[] {
+  if (tempQuicklinks) return tempQuicklinks;
+
+  const quicklinkChibi: QuicklinkObject[] = Object.values(api.settings.getStaticChibi()).map(el => {
+    return {
+      key: el.key,
+      name: el.name,
+      domain: typeof el.domain === 'string' ? el.domain : el.domain[0],
+      database: el.database || null,
+      search:
+        typeof el.search === 'object'
+          ? el.search
+          : {
+              anime: el.type === 'anime' ? el.search || 'home' : null,
+              manga: el.type === 'manga' ? el.search || 'home' : null,
+            },
+    };
+  });
+
+  // **Solves a duplication issue when searching for quicklinks, caused by having 2 instances of the same name**
+  // If a chibi quicklink has the same name as a page quicklink, it will overwrite it
+  // This is done to ensure that chibi quicklinks are always preferred over pages quicklinks
+  // This is because chibi quicklinks are more up-to-date and maintained
+  const combined = new Map<string, QuicklinkObject>();
+  quicklinkPages.forEach(p => combined.set(p.name, p));
+  quicklinkChibi.forEach(c => combined.set(c.name, c));
+
+  tempQuicklinks = Array.from(combined.values());
+  return tempQuicklinks;
+}
+
 export function combinedLinks() {
   const links = api.settings.get('quicklinks');
   const comb = links.map(el => optionToCombined(el)).filter(el => el);
@@ -148,11 +208,16 @@ export function combinedLinks() {
 }
 
 export function optionToCombined(link) {
+  if (!link) return null;
   if (link.custom) return link;
-  return quicklinks.find(el => el.name === link);
+  return getQuicklinks().find(el => el.name === link);
 }
 
-export async function activeLinks(type: 'anime' | 'manga', id: any, searchterm: string): Promise<Quicklink[]> {
+export async function activeLinks(
+  type: 'anime' | 'manga',
+  id: any,
+  searchterm: string,
+): Promise<Quicklink[]> {
   let combined = combinedLinks();
 
   if (id) {
@@ -169,7 +234,7 @@ export async function activeLinks(type: 'anime' | 'manga', id: any, searchterm: 
 export function removeOptionKey(options, key) {
   if (!key) return options;
   return options.filter(el => {
-    if (el === key || (typeof el === 'object' && el.name === key)) return false;
+    if (!el || el === key || (typeof el === 'object' && el.name === key)) return false;
     return true;
   });
 }
@@ -177,4 +242,12 @@ export function removeOptionKey(options, key) {
 export function removeFromOptions(key) {
   const options = api.settings.get('quicklinks');
   api.settings.set('quicklinks', removeOptionKey(options, key));
+}
+
+export function getPages() {
+  return quicklinkPages;
+}
+
+export function getAllPages() {
+  return getQuicklinks();
 }

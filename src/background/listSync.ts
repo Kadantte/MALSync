@@ -1,7 +1,8 @@
-import * as Sync from '../minimal/minimalApp/listSync/syncHandler';
+import * as Sync from '../utils/syncHandler';
+import { KeepAlive } from './keepAlive';
 
 export function listSyncInit() {
-  chrome.alarms.get('listSync', async function(a) {
+  chrome.alarms.get('listSync', async function (a) {
     const listSyncLast = await api.storage.get('listSyncLast');
     const syncInterval = 23 * 60;
 
@@ -19,13 +20,18 @@ export function listSyncInit() {
     });
   });
 
-  chrome.alarms.onAlarm.addListener(function(alarm) {
+  chrome.alarms.onAlarm.addListener(function (alarm) {
     if (alarm.name === 'listSync') {
       api.storage.set('listSyncLast', Date.now());
       api.settings.init().then(async () => {
         console.groupCollapsed('listSync');
-        await Sync.background.sync();
-        console.groupEnd();
+        const alive = new KeepAlive();
+        alive.start();
+
+        Sync.background.sync().finally(() => {
+          alive.stop();
+          console.groupEnd();
+        });
       });
     }
   });

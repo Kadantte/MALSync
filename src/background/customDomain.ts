@@ -1,95 +1,118 @@
+import { ChibiListRepository } from '../pages-chibi/loader/ChibiListRepository';
 import { isIframeUrl } from '../utils/manifest';
 
 const logger = con.m('Custom Domain');
 
-type domainType = { domain: string; page: string };
+export type domainType = {
+  domain: string;
+  page: string;
+  auto?: boolean;
+  proxy?: string;
+  chibi?: boolean;
+  player?: boolean;
+};
 
 export async function initCustomDomain() {
-  await setListener();
   updateListener();
+  await registerScripts();
   logger.log('Initialed');
 }
 
 function updateListener() {
-  chrome.permissions.onAdded.addListener(setListener);
-  chrome.permissions.onRemoved.addListener(setListener);
+  chrome.permissions.onAdded.addListener(registerScripts);
+  chrome.permissions.onRemoved.addListener(registerScripts);
   api.storage.storageOnChanged((changes, namespace) => {
     if (namespace === 'sync' && changes['settings/customDomains']) {
       logger.log('settings/customDomains changed');
-      setListener();
+      registerScripts();
     }
   });
 }
 
-async function setListener() {
-  if (typeof chrome.webNavigation === 'undefined') {
+async function registerScripts() {
+  if (typeof chrome.scripting === 'undefined') {
     con.error('Custom Domain is not possible');
     return;
   }
-  const domains: domainType[] = await api.settings.getAsync('customDomains');
-  clearListener();
-  if (domains) domains.forEach(d => singleListener(d));
+
+  let domains: domainType[] = await api.settings.getAsync('customDomains');
+
+  try {
+    const chibiRepo = await (await ChibiListRepository.getInstance()).init();
+    const chibiDomains = await chibiRepo.getPermissions();
+
+    // Filter out custom domains that exist in chibi
+    domains = domains.filter(domain => {
+      return domain.player || !chibiRepo.getList()[domain.page]?.features?.customDomains;
+    });
+
+    domains = domains.concat(chibiDomains);
+  } catch (e) {
+    logger.error('Could not load chibi permissions', e);
+  }
+
+  // Runs on every service worker start. Re-registering blocks the browser UI thread for ~200ms (#3866)
+  const state = JSON.stringify(domains);
+  const lastState = await chrome.storage.session
+    ?.get('customDomainScripts')
+    .then(res => res.customDomainScripts)
+    .catch(() => undefined);
+  if (lastState === state) {
+    logger.log('Scripts up to date');
+    return;
+  }
+
+  await chrome.scripting.unregisterContentScripts();
+  if (domains) {
+    await Promise.all(domains.map(registerScript));
+  }
+  await chrome.storage.session?.set({ customDomainScripts: state }).catch(() => {});
+
+  const scripts = await chrome.scripting.getRegisteredContentScripts();
+  logger.log(scripts);
 }
 
-let listenerArray: any[] = [];
+async function registerScript(domainConfig: domainType) {
+  if (domainConfig.page === 'hostpermission') return;
+  let fixDomain = domainConfig.domain;
 
-function clearListener() {
-  logger.log('Clear listener', listenerArray.length);
-  listenerArray.forEach(listen => chrome.webNavigation.onCompleted.removeListener(listen));
-  listenerArray = [];
-}
+  if (domainConfig.chibi || domainConfig.proxy) {
+    // Remove port. Chibi will handle the port onsite
+    fixDomain = fixDomain.replace(/:\d+/, '');
+  }
 
-function singleListener(domainConfig: domainType) {
-  const callback = data => {
-    logger.m('Navigation').log(domainConfig, data);
-    if (domainConfig.page === 'iframe') {
-      if (!data.frameId) {
-        logger.m('Navigation').log('Do not inject iframe on root page');
-        return;
-      }
-      chrome.tabs.executeScript(data.tabId, {
-        file: 'vendor/jquery.min.js',
-        frameId: data.frameId,
-      });
-      chrome.tabs.executeScript(data.tabId, {
-        file: 'i18n.js',
-        frameId: data.frameId,
-      });
-      chrome.tabs.executeScript(data.tabId, {
-        file: 'content/iframe.js',
-        frameId: data.frameId,
-      });
+  try {
+    const scriptConfig = {
+      id: fixDomain,
+      js: ['vendor/jquery.min.js', 'i18n.js'],
+      matches: [fixDomain],
+      allFrames: false,
+      runAt: 'document_start' as const,
+      world: undefined as 'MAIN' | 'ISOLATED' | undefined,
+    };
+
+    if (domainConfig.page === 'iframe' || domainConfig.player) {
+      scriptConfig.js.push('content/iframe.js');
+      scriptConfig.allFrames = true;
+    } else if (domainConfig.chibi) {
+      scriptConfig.js.push('content/chibi.js');
+      scriptConfig.js.push('content/content-script.js');
+    } else if (domainConfig.proxy) {
+      scriptConfig.id = `${scriptConfig.id}-${domainConfig.page}`;
+      scriptConfig.js = [domainConfig.proxy];
+      scriptConfig.world = 'MAIN';
     } else {
-      if (data.frameId) {
-        logger.m('Navigation').log('Do not inject page scripts in Iframe');
-        return;
-      }
-      chrome.tabs.executeScript(data.tabId, {
-        file: 'vendor/jquery.min.js',
-        frameId: data.frameId,
-      });
-      chrome.tabs.executeScript(data.tabId, {
-        file: 'i18n.js',
-        frameId: data.frameId,
-      });
-      chrome.tabs.executeScript(data.tabId, {
-        file: `content/page_${domainConfig.page}.js`,
-        frameId: data.frameId,
-      });
-      chrome.tabs.executeScript(data.tabId, {
-        file: 'content/content-script.js',
-        frameId: data.frameId,
-      });
+      scriptConfig.js.push(`content/page_${domainConfig.page}.js`);
+      scriptConfig.js.push('content/content-script.js');
     }
-  };
-  listenerArray.push(callback);
-  chrome.webNavigation.onCompleted.addListener(callback, {
-    url: [{ originAndPathMatches: domainConfig.domain }],
-  });
-  logger
-    .m('registred')
-    .m(domainConfig.page)
-    .log(domainConfig.domain);
+
+    await chrome.scripting.registerContentScripts([scriptConfig]);
+  } catch (e) {
+    logger.error(`Could not add listener for ${fixDomain}`, e);
+    return;
+  }
+
+  logger.m('registred').m(domainConfig.page).log(fixDomain);
 }
 
 export async function cleanupCustomDomains() {
@@ -101,7 +124,9 @@ export async function cleanupCustomDomains() {
 
   let pageOrigins: string[] = [];
   pageScripts.forEach((item: any) => {
-    pageOrigins = pageOrigins.concat(item.matches.map(origin => getComparableDomains(origin)).filter(el => el));
+    pageOrigins = pageOrigins.concat(
+      item.matches.map(origin => getComparableDomains(origin)).filter(el => el),
+    );
   });
 
   const customDomains = await api.settings.getAsync('customDomains');

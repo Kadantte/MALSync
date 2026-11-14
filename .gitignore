@@ -22,6 +22,7 @@ build/Release
 yarn.lock
 node_modules/
 jspm_packages/
+pnpm-lock.yaml
 
 # Optional npm cache directory
 .npm
@@ -45,3 +46,8 @@ bwd/
 dist/
 
 src/utils/quicklinks.json
+src/chibiScript/ChibiGeneratorTypes.ts
+
+# IDE
+.idea
+src/chibiScript/FUNCTIONS.md

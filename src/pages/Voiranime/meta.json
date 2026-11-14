@@ -1,5 +1,6 @@
 {
+  "search": "https://voiranime.cx/?s={searchtermPlus}",
   "urls": {
-    "match": ["*://voiranime.com/*"]
+    "match": [  "*://*.voiranime.cx/*"]
   }
 }

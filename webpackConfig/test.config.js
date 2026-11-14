@@ -1,10 +1,15 @@
 const webpack = require('webpack');
 const path = require('path');
-const VueLoaderPlugin = require('vue-loader/lib/plugin');
+const { VueLoaderPlugin } = require('vue-loader');
+
+const { getKeys } = require('./utils/keys');
 
 module.exports = {
   entry: {
-    index: path.join(__dirname, '..', 'test/index.ts'),
+    testCode: path.join(__dirname, '..', 'test/index.ts'),
+    // Tooling for test/chibiDev/cli.js
+    chibiDev: path.join(__dirname, '..', 'test/chibiDev/runtime.ts'),
+    chibiDevProxy: path.join(__dirname, '..', 'src/pages-chibi/proxies/requestProxy.ts'),
   },
   module: {
     rules: [
@@ -19,13 +24,14 @@ module.exports = {
       {
         test: /\.less$/,
         exclude: /node_modules/,
-        use: [{ loader: 'to-string-loader' }, { loader: 'css-loader' }, { loader: 'less-loader' }],
+        use: ['style-loader', 'css-loader', 'less-loader'],
       },
       {
         test: /\.vue$/,
         exclude: /node_modules/,
         loader: 'vue-loader',
         options: {
+          customElement: true,
           shadowMode: true,
         },
       },
@@ -35,12 +41,17 @@ module.exports = {
   resolve: {
     extensions: ['.tsx', '.ts', '.js', '.less'],
     alias: {
-      vue$: 'vue/dist/vue.esm.js',
+      vue: '@vue/runtime-dom',
+    },
+  },
+  resolveLoader: {
+    alias: {
+      'to-string-loader': require.resolve('./utils/toStringLoader'),
     },
   },
   mode: 'development',
   output: {
-    filename: 'testCode.js',
+    filename: '[name].js',
     path: path.resolve(__dirname, '..', 'test', 'dist'),
   },
   plugins: [
@@ -52,9 +63,10 @@ module.exports = {
       api: path.resolve(__dirname, './../src/api/webextension'),
     }),
     new webpack.DefinePlugin({
-      env: JSON.stringify({
-        CONTEXT: process.env.MODE === 'travis' ? 'production' : 'development',
-      }),
+      __VUE_OPTIONS_API__: true,
+      __VUE_PROD_DEVTOOLS__: false,
+      __MAL_SYNC_KEYS__: JSON.stringify(getKeys()),
+      __IS_FIREFOX__: false,
     }),
   ],
 };

@@ -1,7 +1,17 @@
 <template>
-  <div id="malkiss" class="simkltvdetailonline" :class="{ Minimized: classes.minimized, Search: classes.search }">
+  <div
+    id="malkiss"
+    class="simkltvdetailonline"
+    :class="{ Minimized: classes.minimized, Search: classes.search }"
+  >
     <div class="malsync-page-relation">
-      <a v-for="page in pageRelation" :key="page.title" :href="page.link" target="_blank" :title="page.name">
+      <a
+        v-for="page in pageRelation"
+        :key="page.title"
+        :href="page.link"
+        target="_blank"
+        :title="page.name"
+      >
         <img :src="page.icon" width="16" height="16" />
       </a>
     </div>
@@ -18,35 +28,58 @@
             <img :src="favicon(streamUrl.split('/')[2])" alt="" :title="streamUrl.split('/')[2]" />
           </div>
         </a>
-        <a v-if="continueUrl" :href="continueUrl" target="_blank" class="simkltvdetailonlineheadbutton">
-          <div class="simkltvdetailonlineheadbuttontitle">
-            Watch next episode
-          </div>
-          <div class="simkltvdetailonlineheadbuttonico" style="margin-top: -4px;"></div>
+        <a
+          v-if="continueUrl"
+          :href="continueUrl"
+          target="_blank"
+          class="simkltvdetailonlineheadbutton"
+        >
+          <div class="simkltvdetailonlineheadbuttontitle">Watch next episode</div>
+          <div class="simkltvdetailonlineheadbuttonico" style="margin-top: -4px"></div>
         </a>
-        <a v-if="resumeUrl && !continueUrl" :href="resumeUrl" target="_blank" class="simkltvdetailonlineheadbutton">
+        <a
+          v-if="resumeUrl && !continueUrl"
+          :href="resumeUrl"
+          target="_blank"
+          class="simkltvdetailonlineheadbutton"
+        >
           <div class="simkltvdetailonlineheadbuttontitle">Resume episode</div>
-          <img :src="assetUrl('arrow-16px.png')" width="16" height="16" style="filter: invert(1); margin-top: -1px;" />
+          <img
+            :src="assetUrl('arrow-16px.png')"
+            width="16"
+            height="16"
+            style="filter: invert(1); margin-top: -1px"
+          />
         </a>
         <div
           v-if="links === null || Object.keys(links).length"
           class="simkltvdetailonlineheadbutton Sources"
           @click="toggleMinimized()"
         >
-          <div v-if="links !== null && Object.keys(links).length" class="simkltvdetailonlineheadbuttontitle">
+          <div
+            v-if="links !== null && Object.keys(links).length"
+            class="simkltvdetailonlineheadbuttontitle"
+          >
             {{ Object.keys(links).length }} streaming sources
           </div>
           <div v-else class="simkltvdetailonlineheadbuttontitle">Loading</div>
           <div class="simkltvdetailonlineheadbuttonicoarrow"></div>
         </div>
-        <div v-if="pageSearch !== null" class="simkltvdetailonlineheadbutton Search" @click="toggleSearch()">
+        <div
+          v-if="pageSearch !== null"
+          class="simkltvdetailonlineheadbutton Search"
+          @click="toggleSearch()"
+        >
           <div class="simkltvdetailonlineheadbuttontitle">Search</div>
           <div class="simkltvdetailonlineheadbuttonicoarrow"></div>
         </div>
       </div>
       <div class="simkltvdetailonlineheadright" @click="pressMinimized()">
         <div class="simkltvdetailonlineheadrightclose">
-          <div class="simkltvdetailonlineheadrightname" style="--data-online-block-title:'MAL-Sync';"></div>
+          <div
+            class="simkltvdetailonlineheadrightname"
+            style="--data-online-block-title: 'MAL-Sync'"
+          ></div>
           <div class="simkltvdetailonlineheadrightcloseico"></div>
         </div>
       </div>
@@ -93,18 +126,19 @@
   </div>
 </template>
 
-<script type="text/javascript">
+<script lang="ts">
+import { localStore } from '../utils/localStore';
 import { removeFromOptions } from '../utils/quicklinksBuilder';
 
 const STORAGE_KEY = 'SIMKL-MAL-SYNC';
 export default {
   data: () => ({
-    streamUrl: undefined,
+    streamUrl: undefined as undefined | string,
     continueUrl: null,
     resumeUrl: null,
-    links: null,
-    pageSearch: null,
-    pageRelation: null,
+    links: null as any,
+    pageSearch: null as any,
+    pageRelation: null as any,
     classes: {
       minimized: true,
       search: false,
@@ -119,7 +153,7 @@ export default {
     },
   },
   created() {
-    const classes = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    const classes = JSON.parse(localStore.getItem(STORAGE_KEY)!);
     if (classes) {
       this.classes = classes;
     }
@@ -158,7 +192,7 @@ export default {
       window.location.reload();
     },
     saveClasses() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.classes));
+      localStore.setItem(STORAGE_KEY, JSON.stringify(this.classes));
     },
   },
 };
@@ -183,5 +217,8 @@ export default {
   & > a {
     margin-left: 5px;
   }
+}
+.simkltvdetailonlineitemlinks {
+  word-break: break-all;
 }
 </style>

@@ -9,19 +9,25 @@
     </div>
 
     <div class="loadingBar">
-      <div v-show="loading" class="mdl-progress mdl-js-progress mdl-progress__indeterminate" style="width: 100%;">
-        <div class="progressbar bar bar1" style="width: 0%;"></div>
-        <div class="bufferbar bar bar2" style="width: 100%;"></div>
-        <div class="auxbar bar bar3" style="width: 0%;"></div>
+      <div
+        v-show="loading"
+        class="mdl-progress mdl-js-progress mdl-progress__indeterminate"
+        style="width: 100%"
+      >
+        <div class="progressbar bar bar1" style="width: 0%"></div>
+        <div class="bufferbar bar bar2" style="width: 100%"></div>
+        <div class="auxbar bar bar3" style="width: 0%"></div>
       </div>
     </div>
 
     <div v-if="searchKeyword" class="results">
-      <a class="result" href="" style="cursor: pointer;" @click="clickItem($event, '')">
+      <a class="result" href="" style="cursor: pointer" @click="clickItem($event, '')">
         <div class="image"></div>
         <div class="right">
-          <span class="title">{{ lang('correction_NoEntry') }}</span>
-          <p>{{ lang('correction_NoMal') }}</p>
+          <span class="title">{{
+            lang('correction_NoEntry', [providerTemplates(type).shortName])
+          }}</span>
+          <p>{{ lang('correction_NoMal', [providerTemplates(type).shortName]) }}</p>
         </div>
       </a>
       <a
@@ -38,7 +44,9 @@
           <template v-if="item.list">
             <p>{{ lang('UI_Status') }} {{ getStatusText(type, item.list.status) }}</p>
             <p v-if="item.list.score">{{ lang('UI_Score') }} {{ item.list.score }}</p>
-            <p v-else-if="item.list.status === 1">{{ episodeText(type) }} {{ item.list.episode }}</p>
+            <p v-else-if="item.list.status === 1">
+              {{ episodeText(type) }} {{ item.list.episode }}
+            </p>
           </template>
           <template v-else>
             <p v-if="item.media_type">{{ lang('search_Type') }} {{ item.media_type }}</p>
@@ -51,15 +59,18 @@
   </div>
 </template>
 
-<script type="text/javascript">
+<script lang="ts">
+import { PropType } from 'vue';
 import { normalSearch } from '../../../utils/Search';
+import { searchResult } from '../../definitions';
+import { providerTemplates } from '../../../provider/templates';
 
 let searchTimeout;
 export default {
   components: {},
   props: {
     type: {
-      type: String,
+      type: String as PropType<'anime' | 'manga'>,
       default: 'anime',
     },
     keyword: {
@@ -77,7 +88,7 @@ export default {
   },
   data() {
     return {
-      items: [],
+      items: [] as searchResult[],
       loading: false,
       searchKeyword: '',
     };
@@ -107,6 +118,7 @@ export default {
     lang: api.storage.lang,
     getStatusText: utils.getStatusText,
     episodeText: utils.episode,
+    providerTemplates,
     load() {
       if (this.searchKeyword) {
         this.loading = true;

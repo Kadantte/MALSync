@@ -56,7 +56,10 @@
   </div>
 </template>
 
-<script type="text/javascript">
+<script lang="ts">
+import { PropType } from 'vue';
+import { ScoreOption } from '../_provider/ScoreMode/ScoreModeStrategy';
+
 export default {
   props: {
     value: {
@@ -67,7 +70,7 @@ export default {
       default() {
         return [];
       },
-      type: Array,
+      type: Array as PropType<ScoreOption[]>,
     },
     label: {
       default: '',

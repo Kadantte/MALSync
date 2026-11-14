@@ -1,22 +1,30 @@
 import { searchInterface } from '../definitions';
 import { parseJson } from '../Errors';
+import { buildProviderUrl } from '../../utils/slugs';
 import * as helper from './helper';
 
-export const search: searchInterface = async function(keyword, type: 'anime' | 'manga', options = {}, sync = false) {
+export const search: searchInterface = async function (
+  keyword,
+  type: 'anime' | 'manga',
+  options = {},
+  sync = false,
+) {
   return call(`https://api.simkl.com/search/${type}`, { q: keyword }, true).then(res => {
     const resItems: any = [];
     con.log('search', res);
-    j.$.each(res, function(index, item) {
+    j.$.each(res, function (index, item) {
       resItems.push({
         id: item.ids.simkl_id,
         name: item.title,
         altNames: [],
-        url: `https://simkl.com/${type}/${item.ids.simkl_id}/${item.ids.slug}`,
+        url: buildProviderUrl('SIMKL', type, item.ids.simkl_id),
         malUrl: async () => {
           const malId = await simklIdToMal(item.ids.simkl_id);
-          return malId ? `https://myanimelist.net/${type}/${malId}` : null;
+          return malId ? buildProviderUrl('MAL', type, malId) : null;
         },
-        image: `https://simkl.in/posters/${item.poster}_cm.jpg`,
+        image: `https://simkl.in/posters/${item.poster}_ca.jpg`,
+        imageLarge: `https://simkl.in/posters/${item.poster}_m.jpg`,
+        imageBanner: `https://simkl.in/posters/${item.poster}_w.jpg`,
         media_type: item.type,
         isNovel: false,
         score: null,
@@ -27,7 +35,13 @@ export const search: searchInterface = async function(keyword, type: 'anime' | '
   });
 };
 
-async function call(url, sData = {}, asParameter = false, methode: 'GET' | 'POST' = 'GET', login = true) {
+async function call(
+  url,
+  sData = {} as any,
+  asParameter = false,
+  methode: 'GET' | 'POST' = 'GET',
+  login = true,
+) {
   if (asParameter) {
     url += `?${j.$.param(sData)}`;
   }
@@ -42,6 +56,10 @@ async function call(url, sData = {}, asParameter = false, methode: 'GET' | 'POST
 
   if (!login) {
     con.log('No login');
+  }
+
+  if (methode === 'GET') {
+    sData = undefined;
   }
 
   return api.request
@@ -63,7 +81,7 @@ async function call(url, sData = {}, asParameter = false, methode: 'GET' | 'POST
             break;
           }
           utils.flashm(
-            'Please Authenticate <a target="_blank" href="https://simkl.com/oauth/authorize?response_type=code&client_id=39e8640b6f1a60aaf60f3f3313475e830517badab8048a4e52ff2d10deb2b9b0&redirect_uri=https://simkl.com/apps/chrome/mal-sync/connected/">Here</a>',
+            `Please Authenticate <a target="_blank" href="${helper.getAuthUrl()}">Here</a>`,
             { error: true, type: 'error' },
           );
           throw getThrowError();

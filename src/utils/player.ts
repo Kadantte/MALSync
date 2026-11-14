@@ -1,13 +1,51 @@
-let inter;
-
 const logger = con.m('Player');
 
-export function getPlayerTime(callback) {
-  clearInterval(inter);
-  inter = setInterval(function() {
-    const players = document.getElementsByTagName('video');
+export type PlayerTime = {
+  current: number;
+  duration: number;
+  paused: boolean;
+};
+
+export class PlayerSingleton {
+  // eslint-disable-next-line es-x/no-class-static-fields
+  private static instance: PlayerSingleton = new PlayerSingleton();
+
+  public currentPlayer: HTMLVideoElement | null = null;
+
+  private listeners: { [key: string]: (time: PlayerTime, player?: HTMLVideoElement) => void } = {};
+
+  addListener(key: string, callback: (time: PlayerTime, player?: HTMLVideoElement) => void) {
+    this.listeners[key] = callback;
+  }
+
+  removeListener(key: string) {
+    delete this.listeners[key];
+  }
+
+  notifyListeners(time: PlayerTime, player?: HTMLVideoElement) {
+    Object.values(this.listeners).forEach(callback => {
+      callback(time, player);
+    });
+  }
+
+  private constructor() {
+    // Singleton
+  }
+
+  public startTracking() {
+    setInterval(() => {
+      if (this.trackPlayers(document.getElementsByTagName('video'))) return;
+      // Some players (vk) render the video inside an open shadow root
+      if (this.trackPlayers(getShadowVideos())) return;
+      this.currentPlayer = null;
+    }, 1000);
+
+    return this;
+  }
+
+  private trackPlayers(players: ArrayLike<HTMLVideoElement>) {
     for (let i = 0; i < players.length; i++) {
-      const player: any = players[i];
+      const player: HTMLVideoElement = players[i];
       const { duration } = player;
       const current = player.currentTime;
       const { paused } = player;
@@ -19,17 +57,69 @@ export function getPlayerTime(callback) {
           paused,
         };
         logger.debug(window.location.href, item);
-        callback(item, player);
+        this.currentPlayer = player;
+        this.notifyListeners(item, player);
         playerExtras(item, player);
-        break;
+        return true;
       }
     }
-  }, 1000);
+    return false;
+  }
+
+  protected proxySetTime: ((time: number) => void) | null = null;
+
+  protected proxySetTimeTimeout: NodeJS.Timeout | null = null;
+
+  /** Used by iframe Proxy */
+  public setIframeProgress(time: PlayerTime, setTime?: (time: number) => void) {
+    if (typeof setTime !== 'undefined') {
+      this.proxySetTime = setTime;
+      clearTimeout(this.proxySetTimeTimeout!);
+      this.proxySetTimeTimeout = setTimeout(() => {
+        this.proxySetTime = null;
+      }, 15000);
+    }
+    this.notifyListeners(time);
+  }
+
+  public canSetTime() {
+    return Boolean(this.proxySetTime) || Boolean(this.currentPlayer);
+  }
+
+  public async setTime(time: number) {
+    if (!time || time < 0) return;
+    if (this.proxySetTime) {
+      this.proxySetTime(time);
+    } else if (this.currentPlayer) {
+      await this.currentPlayer.play();
+      this.currentPlayer.currentTime = time;
+    }
+  }
+
+  static getInstance() {
+    if (!PlayerSingleton.instance) {
+      PlayerSingleton.instance = new PlayerSingleton();
+    }
+    return PlayerSingleton.instance;
+  }
+}
+
+// Players that render their video inside an open shadow root
+const shadowVideoHosts = [
+  '.shadow-root-container', // vk
+].join(',');
+
+function getShadowVideos(): HTMLVideoElement[] {
+  const videos: HTMLVideoElement[] = [];
+  document.querySelectorAll(shadowVideoHosts).forEach(host => {
+    if (host.shadowRoot) videos.push(...Array.from(host.shadowRoot.querySelectorAll('video')));
+  });
+  return videos;
 }
 
 let videoIdentifier = '';
 
-function playerExtras(item, player) {
+function playerExtras(item: PlayerTime, player: HTMLVideoElement) {
   const tempVideoIdentifier = player.currentSrc;
   if (item.current > 1 && videoIdentifier !== tempVideoIdentifier) {
     videoIdentifier = tempVideoIdentifier;
@@ -41,7 +131,10 @@ function playerExtras(item, player) {
 
 async function setFullscreen(player) {
   if (!(await api.settings.getAsync('autofull'))) return;
-  if (window.fullScreen || (window.innerWidth === window.screen.width && window.innerHeight === window.screen.height)) {
+  if (
+    window.fullScreen ||
+    (window.innerWidth === window.screen.width && window.innerHeight === window.screen.height)
+  ) {
     con.info('Browser already in fullscreen');
   } else {
     let playerEl = player;
@@ -93,7 +186,11 @@ async function setFullscreen(player) {
       }
 
       function exitHandler() {
-        if (document.webkitIsFullScreen || document.mozFullScreen || document.msFullscreenElement !== null) {
+        if (
+          document.webkitIsFullScreen ||
+          document.mozFullScreen ||
+          document.msFullscreenElement !== null
+        ) {
           player.removeAttribute('controls', 'controls');
         }
       }
@@ -193,6 +290,7 @@ export function shortcutListener(callback) {
     function keyEvent(e) {
 
       e = e || event;
+      if (e.repeat) return;
       const key = e.which || e.keyCode;
       keyMap[key] = e.type === 'keydown';
 
@@ -201,7 +299,7 @@ export function shortcutListener(callback) {
         if (checkShortcut(option)) {
           if (
             e.target instanceof Node &&
-            (/textarea|input|select/i.test(e.target.nodeName) || (e.target instanceof Element && e.target.shadowRoot))
+            (/textarea|input|select/i.test(e.target.nodeName) || (e.target instanceof Element && (e.target.shadowRoot || e.target.isContentEditable)))
           ) {
             con.info('Input field. Shortcut suppressed.');
           } else {

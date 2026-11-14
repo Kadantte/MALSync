@@ -23,13 +23,28 @@ module.exports = {
     match: ['*://anilist.co/*'],
   },
   kitsu: {
-    match: ['*://kitsu.io/*'],
+    match: ['*://kitsu.app/*'],
+  },
+  mangabaka: {
+    match: ['*://mangabaka.org/*'],
   },
   simkl: {
     match: ['*://simkl.com/*'],
   },
   malsync: {
     match: ['*://malsync.moe/mal/oauth*'],
+  },
+  malsyncAnilist: {
+    match: ['*://malsync.moe/anilist/oauth*'],
+  },
+  malsyncMangabaka: {
+    match: ['*://malsync.moe/mangabaka/oauth*'],
+  },
+  malsyncAnimeoshi: {
+    match: ['*://malsync.moe/animeoshi/oauth*'],
+  },
+  malsyncShiki: {
+    match: ['*://malsync.moe/shikimori/oauth*'],
   },
   malsyncPwa: {
     match: ['*://malsync.moe/pwa*'],

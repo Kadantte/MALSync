@@ -1,0 +1,32 @@
+{
+  "title": "KaynScans",
+  "url": "https://kaynscans.com",
+  "testCases": [
+    {
+      "url": "https://kaynscans.com/series/comic/i-became-a-married-man-in-another-world/chapter/29",
+      "expected": {
+        "sync": true,
+        "title": "I Became A Married Man in Another World",
+        "identifier": "i-became-a-married-man-in-another-world",
+        "overviewUrl": "https://kaynscans.com/series/comic/i-became-a-married-man-in-another-world",
+        "episode": 29,
+        "nextEpUrl": "https://kaynscans.com/series/comic/i-became-a-married-man-in-another-world/chapter/30",
+        "uiSelector": false
+      }
+    },
+    {
+      "url": "https://kaynscans.com/series/comic/i-became-a-married-man-in-another-world",
+      "expected": {
+        "sync": false,
+        "title": "I Became A Married Man in Another World",
+        "identifier": "i-became-a-married-man-in-another-world",
+        "image": "https://kaynscans.com/uploads/api/a5b0b2a2f05ae1c08e6913c44b29894b.png",
+        "uiSelector": true,
+        "epList": {
+          "1": "https://kaynscans.com/series/comic/i-became-a-married-man-in-another-world/chapter/1",
+          "29": "https://kaynscans.com/series/comic/i-became-a-married-man-in-another-world/chapter/29"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "title": "AnimeLib",
+  "url": "https://v3.animelib.org",
+  "testCases": [
+    {
+      "url": "https://v3.animelib.org/ru/anime/16133--jujutsu-kaisen-anime/watch?episode=41924",
+      "expected": {
+        "sync": true,
+        "title": "Магическая битва",
+        "identifier": "16133",
+        "overviewUrl": "https://v3.animelib.org/ru/anime/16133--jujutsu-kaisen-anime",
+        "nextEpUrl": "https://v3.animelib.org/ru/anime/16133--jujutsu-kaisen-anime/watch?episode=41925",
+        "image": "https://cover.hentaicdn.org/uploads/anime/16133/cover/8f91a865-14d4-4c23-affb-13c8d032ba29.jpg",
+        "episode": 1,
+        "uiSelector": false
+      }
+    },
+    {
+      "url": "https://v3.animelib.org/ru/anime/16133--jujutsu-kaisen-anime",
+      "expected": {
+        "sync": false,
+        "title": "Jujutsu Kaisen",
+        "identifier": "16133",
+        "image": "https://cover.hentaicdn.org/uploads/anime/16133/cover/8f91a865-14d4-4c23-affb-13c8d032ba29.jpg",
+        "uiSelector": true
+      }
+    }
+  ]
+}

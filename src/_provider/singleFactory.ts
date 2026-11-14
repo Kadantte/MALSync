@@ -1,58 +1,65 @@
+import { urlToSlug } from '../utils/slugs';
 import * as helper from './helper';
+import { SyncTypes } from './helper';
 import { Cache } from '../utils/Cache';
+import { SingleAbstract } from './singleAbstract';
 
 import { Single as MalSingle } from './MyAnimeList_hybrid/single';
 import { Single as MalApiSingle } from './MyAnimeList_api/single';
-import { Single as SnilistSingle } from './AniList/single';
-import { Single as SitsuSingle } from './Kitsu/single';
+import { Single as AnilistSingle } from './AniList/single';
+import { Single as KitsuSingle } from './Kitsu/single';
+import { Single as MangaBakaSingle } from './MangaBaka/single';
 import { Single as SimklSingle } from './Simkl/single';
+import { Single as ShikiSingle } from './Shikimori/single';
+import { Single as OshiSingle } from './AnimeOshi/single';
 import { Single as LocalSingle } from './Local/single';
+
+export const singleClasses: { [key in SyncTypes]: new (url: string) => SingleAbstract } = {
+  MAL: MalSingle,
+  MALAPI: MalApiSingle,
+  ANILIST: AnilistSingle,
+  KITSU: KitsuSingle,
+  MANGABAKA: MangaBakaSingle,
+  SIMKL: SimklSingle,
+  SHIKI: ShikiSingle,
+  ANIMEOSHI: OshiSingle,
+};
 
 export function getSingle(url: string) {
   if (/^local:\/\//i.test(url)) {
     return new LocalSingle(url);
   }
-  const syncMode = helper.getSyncMode(url);
-  if (syncMode === 'MAL') {
-    return new MalSingle(url);
+
+  const slug = urlToSlug(url);
+  if (!slug.path) {
+    throw new Error(`URL not supported: ${url}`);
   }
-  if (syncMode === 'MALAPI') {
-    return new MalApiSingle(url);
+
+  const syncMode = helper.getSyncMode(slug.path.type);
+  if (!singleClasses[syncMode]) {
+    throw 'Unknown sync mode';
   }
-  if (syncMode === 'ANILIST') {
-    return new SnilistSingle(url);
-  }
-  if (syncMode === 'KITSU') {
-    return new SitsuSingle(url);
-  }
-  if (syncMode === 'SIMKL') {
-    return new SimklSingle(url);
-  }
-  throw 'Unknown sync mode';
+  return new singleClasses[syncMode](url);
 }
 
-export async function getCacheKey(url: string): Promise<{ cacheKey: string; singleObj? }> {
-  if (/^https:\/\/myanimelist.net\/(anime|manga)\/\d+(\/|$)/.test(url)) {
-    return {
-      cacheKey: url.split('/')[4],
-    };
-  }
-
-  const cacheObj = new Cache(`cacheKey/${url}`, 7 * 24 * 60 * 60 * 1000);
+export async function getRulesCacheKey(
+  url: string,
+): Promise<{ rulesCacheKey: string | number; singleObj? }> {
+  const cacheObj = new Cache(`rulesCacheKey/${url}`, 7 * 24 * 60 * 60 * 1000);
 
   if (await cacheObj.hasValue()) {
     return cacheObj.getValue().then(res => {
       return {
-        cacheKey: res,
+        rulesCacheKey: res,
       };
     });
   }
 
   const singleObj = getSingle(url);
   await singleObj.update();
-  cacheObj.setValue(singleObj.getCacheKey());
+  cacheObj.setValue(singleObj.getRulesCacheKey());
   return {
-    cacheKey: singleObj.getCacheKey(),
+    rulesCacheKey: singleObj.getRulesCacheKey(),
     singleObj,
   };
 }

@@ -1,7 +1,7 @@
 import { pageInterface } from '../pageInterface';
 
 function GetOverviewAnchor() {
-  const anchor = document.querySelector(`a[href^="/anime"]`) as HTMLAnchorElement;
+  const anchor = document.querySelector('a[href^="/anime"]') as HTMLAnchorElement;
 
   if (!anchor) {
     throw Error("Can't find overview anchor element");
@@ -16,17 +16,25 @@ function RemoveTurkishPhrases(title: string) {
   return title.replace(/(?: |-)[İi]zle.*/i, '');
 }
 
+function GetEpisodeSlug(episodeElement: JQuery<HTMLElement>) {
+  // overview playlist items carry the slug as data attribute, sidebar items link to the episode
+  const slug: string =
+    episodeElement.data('slug') || episodeElement.children('a').first().attr('href') || '';
+
+  return slug.replace(/^\//, '');
+}
+
 function IsOverviewUrl(url: string) {
   return /\/anime\//.test(url);
 }
 
 // Example urls
-// overview page url: https://www.tranimeizle.net/anime/one-punch-man-izle-hd
-// sync page url: https://www.tranimeizle.net/one-punch-man-1-bolum-izle
+// overview page url: https://www.tranimeizle.live/anime/one-punch-man-izle-hd
+// sync page url: https://www.tranimeizle.live/one-punch-man-1-bolum-izle
 
 export const TRanimeizle: pageInterface = {
   name: 'TRanimeizle',
-  domain: 'https://www.tranimeizle.net/',
+  domain: 'https://www.tranimeizle.live',
   languages: ['Turkish'],
   type: 'anime',
   isSyncPage(_url: string) {
@@ -67,13 +75,16 @@ export const TRanimeizle: pageInterface = {
       return Number(url.replace(/.*-(\d{1,})-.*/, '$1') || undefined);
     },
     nextEpUrl: () => {
-      const nextEpisodeAnchor = document.querySelector(`.youtube-wrapper .my-15 a:first-child`) as HTMLAnchorElement;
+      const nextEpisodeAnchor = document.querySelector(
+        '.youtube-wrapper .my-15 a:first-child',
+      ) as HTMLAnchorElement;
 
       if (!nextEpisodeAnchor) {
         throw Error("Can't find next episode anchor element");
       }
 
-      if (!nextEpisodeAnchor.href.includes('izle') || !nextEpisodeAnchor.href.includes('bolum')) return undefined;
+      if (!nextEpisodeAnchor.href.includes('izle') || !nextEpisodeAnchor.href.includes('bolum'))
+        return undefined;
 
       return nextEpisodeAnchor.href;
     },
@@ -112,23 +123,39 @@ export const TRanimeizle: pageInterface = {
     },
     list: {
       offsetHandler: false,
-      elementsSelector: () => j.$('.animeDetail-items li.episodeBtn'),
-      elementUrl: (selector: JQuery<HTMLElement>) => {
+      elementsSelector: () => j.$('.animeDetail-playlist > .animeDetail-items > ol > li'),
+      elementUrl: ($element: JQuery<HTMLElement>) => {
         // episodeSlug: plunderer-1-bolum-izle
-        const episodeSlug: string = selector.data('slug');
+        const episodeSlug = GetEpisodeSlug($element);
+
+        if (!episodeSlug) {
+          throw Error('Unable to get slug from element');
+        }
 
         return `${TRanimeizle.domain}/${episodeSlug}`;
       },
       elementEp: (episodeElement: JQuery<HTMLElement>) => {
-        const episodeMeta = $(`meta[itemprop="episodeNumber"]`, episodeElement);
+        const slug = GetEpisodeSlug(episodeElement);
 
-        return Number(episodeMeta.attr('content'));
+        if (!slug) {
+          throw Error('Unable to get slug');
+        }
+
+        // https://regex101.com/r/KlUgJd/1
+        const matches = slug.match(/.*?-(\d{1,})-bolum-izle/) || [];
+
+        if (!matches) {
+          throw Error('Unable to find episode number');
+        }
+
+        return Number(matches[1]);
       },
     },
   },
   init(page) {
-    // eslint-disable-next-line import/no-unresolved, global-require
-    api.storage.addStyle(require('!to-string-loader!css-loader!less-loader!./style.less').toString());
+    api.storage.addStyle(
+      require('!to-string-loader!css-loader!less-loader!./style.less').toString(),
+    );
 
     j.$(() => {
       if (!TRanimeizle.isSyncPage(page.url) && !IsOverviewUrl(page.url)) return;

@@ -1,0 +1,384 @@
+import type { ChibiGenerator } from '../../../chibiScript/ChibiGenerator';
+import type { PageInterface } from '../../pageInterface';
+
+type CommonMetadata = {
+  Id: string;
+  Path: string;
+  GenreItems: { Name: string }[];
+  Tags: string[];
+};
+
+type EpisodeMetadata = {
+  Type: 'Episode';
+  SeasonId: string;
+  SeasonName: string;
+  SeriesId: string;
+  SeriesName: string;
+  IndexNumber: number;
+  ParentIndexNumber: number;
+} & CommonMetadata;
+
+type SeasonMetadata = {
+  Type: 'Season';
+  SeriesId: string;
+  SeriesName: string;
+  IndexNumber: number;
+} & CommonMetadata;
+
+type MovieMetadata = {
+  Type: 'Movie';
+  Name: string;
+} & CommonMetadata;
+
+type SeriesMetadata = {
+  Type: 'Series';
+} & CommonMetadata;
+
+type Metadata = EpisodeMetadata | SeasonMetadata | MovieMetadata | SeriesMetadata;
+
+type OverviewMeta = SeasonMetadata;
+
+type SyncMeta = EpisodeMetadata | MovieMetadata;
+
+function meta<P>($c: ChibiGenerator<unknown>) {
+  return $c.getGlobalVariable<P>('metadataGlobal');
+}
+
+export const Jellyfin: PageInterface = {
+  name: 'Jellyfin',
+  domain: 'https://jellyfin.org',
+  languages: ['Many'],
+  type: 'anime',
+  minimumVersion: '0.12.5',
+  urls: {
+    match: [],
+  },
+  features: {
+    requestProxy: true,
+    customDomains: true,
+  },
+  sync: {
+    isSyncPage($c) {
+      return $c
+        .and(
+          $c.querySelector('video').boolean().run(),
+          $c
+            .or(
+              $c
+                .exec(meta<SyncMeta>)
+                .get('Type')
+                .equals('Episode')
+                .run(),
+              $c
+                .exec(meta<SyncMeta>)
+                .get('Type')
+                .equals('Movie')
+                .run(),
+            )
+            .run(),
+        )
+        .run();
+    },
+    getTitle($c) {
+      return $c
+        .exec(meta<SyncMeta>)
+        .get('Type')
+        .equals('Movie')
+        .ifThen($c =>
+          $c
+            .exec(meta<MovieMetadata>)
+            .get('Name')
+            .return()
+            .run(),
+        )
+        .exec(meta<EpisodeMetadata>)
+        .get('SeriesName')
+        .run();
+    },
+    getIdentifier($c) {
+      return $c
+        .coalesceFn(
+          $c
+            .exec(meta<EpisodeMetadata>)
+            .get('SeasonId')
+            .run(),
+          $c
+            .exec(meta<EpisodeMetadata>)
+            .get('SeriesId')
+            .run(),
+          $c
+            .exec(meta<SyncMeta>)
+            .get('Id')
+            .run(),
+        )
+        .run();
+    },
+    getOverviewUrl($c) {
+      return $c
+        .url()
+        .replaceRegex(
+          '#[^#]+$',
+          $c.string('#details?id=').concat($c.this('sync.getIdentifier').run()).run(),
+        )
+        .run();
+    },
+    getEpisode($c) {
+      return $c
+        .exec(meta<SyncMeta>)
+        .get('Type')
+        .equals('Movie')
+        .ifThen($any => $any.number(1).return().run())
+        .exec(meta<EpisodeMetadata>)
+        .get('IndexNumber')
+        .run();
+    },
+    getSeason($c) {
+      return $c
+        .exec(meta<SyncMeta>)
+        .get('Type')
+        .equals('Episode')
+        .ifNotReturn()
+        .exec(meta<EpisodeMetadata>)
+        .get('ParentIndexNumber')
+        .exec(skipFirstSeason)
+        .run();
+    },
+  },
+  overview: {
+    isOverviewPage($c) {
+      return $c
+        .exec(meta<OverviewMeta>)
+        .get('Type')
+        .equals('Season')
+        .run();
+    },
+    getTitle($c) {
+      return $c
+        .exec(meta<OverviewMeta>)
+        .get('SeriesName')
+        .run();
+    },
+    getImage($c) {
+      return $c.string('').run();
+    },
+    getIdentifier($c) {
+      return $c
+        .exec(meta<OverviewMeta>)
+        .get('Id')
+        .run();
+    },
+    getSeason($c) {
+      return $c
+        .exec(meta<OverviewMeta>)
+        .get('IndexNumber')
+        .exec(skipFirstSeason)
+        .run();
+    },
+    uiInjection($c) {
+      return $c.querySelector('.page:not(.hide) .detailSectionContent').uiPrepend().run();
+    },
+  },
+  list: {
+    elementsSelector($c) {
+      return $c.querySelectorAll('.detailSection .listItem[data-type="Episode"]').run();
+    },
+    elementEp($c) {
+      return $c.find('.listItemBodyText').text().regex('^\\d+').number().run();
+    },
+  },
+  lifecycle: {
+    setup($c) {
+      return $c.addStyle(require('./style.less?raw').toString()).run();
+    },
+    ready($c) {
+      return $c
+        .requestProxy($c =>
+          $c.setVariable('request').get('url').setVariable('requestUrl').exec(checkRequest).run(),
+        )
+        .run();
+    },
+  },
+};
+
+// Season 1 is not passed on, NaN is ignored as season
+function skipFirstSeason($c: ChibiGenerator<unknown>) {
+  return $c
+    .number()
+    .setVariable('season')
+    .equals(1)
+    .ifThen($c => $c.string('NaN').number().return().run())
+    .getVariable<number>('season');
+}
+
+function checkRequest($c: ChibiGenerator<unknown>) {
+  return $c
+    .getVariable<string>('requestUrl')
+    .matches('/Items/[^/]+/PlaybackInfo(\\?|$)')
+    .ifThen($c => $c.exec(checkPlaybackRequest).return().run())
+    .getVariable<string>('requestUrl')
+    .matches('/Items/[^/]+(\\?|$)')
+    .ifThen($c => $c.exec(checkMetadataRequest).run());
+}
+
+// Up Next also fetches /Items/<id> for the next episode ~30s before the end. PlaybackInfo is only
+// requested for the item that actually starts playing, so it decides which episode gets synced.
+function checkPlaybackRequest($c: ChibiGenerator<unknown>) {
+  return $c
+    .getVariable<string>('requestUrl')
+    .regex('/Items/([^/]+)/PlaybackInfo', 1)
+    .setGlobalVariable('playingItemId')
+    .exec(promotePlayingItem);
+}
+
+// Jellyfin never resets a sync page on its own, so an episode stopped before the videoDuration
+// progress stays armed and any video reaching that progress later syncs it. Clear it when
+// something that is not cached starts, like a show that is not anime.
+function promotePlayingItem($c: ChibiGenerator<unknown>) {
+  return $c
+    .getGlobalVariable($c.getGlobalVariable<string>('playingItemId').run())
+    .ifThen($c => $c.setGlobalVariable('metadataGlobal').trigger().return().run())
+    .getGlobalVariable('metadataGlobal')
+    .ifThen($c => $c.boolean(false).setGlobalVariable('metadataGlobal').trigger().run());
+}
+
+// Cache episodes and movies by id instead of treating them as playing. Metadata and PlaybackInfo
+// can arrive in either order, so both sides try to promote.
+function cachePlayableItem($c: ChibiGenerator<unknown>) {
+  return $c
+    .getVariable('metadata')
+    .setGlobalVariable($c.getVariable<Metadata>('metadata').get('Id').run())
+    .get('Id')
+    .equals($c.getGlobalVariable<string>('playingItemId').run())
+    .ifThen($c => $c.exec(promotePlayingItem).run());
+}
+
+function checkMetadataRequest($c: ChibiGenerator<unknown>) {
+  return $c
+    .getVariable('request')
+    .get('data')
+    .setVariable('metadata')
+    .debounce(500)
+    .log($c.getVariable('metadata').get('Type').run())
+    .get('Type')
+    .equals('Season')
+    .ifThen($c => $c.exec(handleSeason).return().run())
+    .getVariable('metadata')
+    .get('Type')
+    .equals('Episode')
+    .ifThen($c => $c.exec(handleEpisode).return().run())
+    .getVariable('metadata')
+    .get('Type')
+    .equals('Movie')
+    .ifThen($c => $c.exec(handleMovie).return().run())
+    .getVariable('metadata')
+    .get('Type')
+    .equals('Series')
+    .ifThen($c => $c.exec(handleSeries).return().run());
+}
+
+function isAnime($c: ChibiGenerator<unknown>) {
+  return $c
+    .or(
+      $c.getVariable<Metadata>('metadata').get('Path').toLowerCase().includes('anime').run(),
+      $c
+        .getVariable<Metadata>('metadata')
+        .get('GenreItems')
+        .arrayFind(genre => genre.get('Name').toLowerCase().equals('anime').run())
+        .boolean()
+        .run(),
+      $c
+        .getVariable<Metadata>('metadata')
+        .get('Tags')
+        .arrayFind(tag => tag.toLowerCase().equals('anime').run())
+        .boolean()
+        .run(),
+    )
+    .log('isAnime');
+}
+
+// Jellyfin only tags anime on the series, not on the episodes/seasons. Persist the anime flag
+// by series id, and flush any episode that already came through waiting on it.
+function handleSeries($c: ChibiGenerator<unknown>) {
+  return isAnime($c).ifThen($c =>
+    $c
+      .boolean(true)
+      .setPersistentVariable($c.getVariable<SeriesMetadata>('metadata').get('Id').run())
+      .getGlobalVariable(
+        $c
+          .string('pending_')
+          .concat($c.getVariable<SeriesMetadata>('metadata').get('Id').run())
+          .run(),
+      )
+      .ifThen($c => $c.setVariable('metadata').exec(flushPending).run())
+      .run(),
+  );
+}
+
+// A waiting season is an overview page and shows straight away, a waiting episode could be the
+// Up Next one so it still has to be the item that is playing.
+function flushPending($c: ChibiGenerator<unknown>) {
+  return $c
+    .getVariable<Metadata>('metadata')
+    .get('Type')
+    .equals('Episode')
+    .ifThen($c => $c.exec(cachePlayableItem).return().run())
+    .getVariable('metadata')
+    .setGlobalVariable('metadataGlobal')
+    .trigger();
+}
+
+// Anime if its own fields say so, or the parent series was already flagged. Otherwise stash
+// it until the series response shows up.
+function handleSeason($c: ChibiGenerator<unknown>) {
+  return $c.if(
+    $c
+      .or(
+        isAnime($c).run(),
+        $c
+          .getPersistentVariable($c.getVariable<SeasonMetadata>('metadata').get('SeriesId').run())
+          .boolean()
+          .run(),
+      )
+      .run(),
+    $c.getVariable('metadata').setGlobalVariable('metadataGlobal').trigger().run(),
+    $c
+      .getVariable('metadata')
+      .setGlobalVariable(
+        $c
+          .string('pending_')
+          .concat($c.getVariable<SeasonMetadata>('metadata').get('SeriesId').run())
+          .run(),
+      )
+      .run(),
+  );
+}
+
+// Anime if its own fields say so, or the parent series was already flagged. Otherwise stash
+// it until the series response shows up.
+function handleEpisode($c: ChibiGenerator<unknown>) {
+  return $c.if(
+    $c
+      .or(
+        isAnime($c).run(),
+        $c
+          .getPersistentVariable($c.getVariable<EpisodeMetadata>('metadata').get('SeriesId').run())
+          .boolean()
+          .run(),
+      )
+      .run(),
+    $c.exec(cachePlayableItem).run(),
+    $c
+      .getVariable('metadata')
+      .setGlobalVariable(
+        $c
+          .string('pending_')
+          .concat($c.getVariable<EpisodeMetadata>('metadata').get('SeriesId').run())
+          .run(),
+      )
+      .run(),
+  );
+}
+
+function handleMovie($c: ChibiGenerator<unknown>) {
+  return isAnime($c).ifThen($c => $c.exec(cachePlayableItem).run());
+}

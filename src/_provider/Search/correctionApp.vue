@@ -1,15 +1,42 @@
 <template>
-  <div id="material">
-    <div v-if="syncMode && minimized">
-      <a style="cursor: pointer;" @click="minimized = false">
-        Action required
-      </a>
+  <div v-if="syncPage" id="material">
+    <div class="m-s-pill-section">
+      <div class="m-s-pill">
+        <a href="https://malsync.moe/pwa/#/settings" target="_blank">
+          {{ lang('minimalApp_Settings') }}→
+        </a>
+      </div>
+    </div>
+    <div v-if="automatic && minimized">
+      <a style="cursor: pointer" @click="minimized = false"> Action required </a>
+    </div>
+    <div v-else-if="conflictMode" class="scroll">
+      <rule-conflict
+        v-if="ruleConflict"
+        :conflict="ruleConflict"
+        :single="syncPage.singleObj"
+        :current-url="searchClass.getUrl() || ''"
+        @select="selectConflict"
+      ></rule-conflict>
     </div>
     <div v-else class="scroll">
       <entry v-if="!syncMode" :obj="syncPage.singleObj"></entry>
-      <rules :obj="rulesClass"></rules>
+      <rules
+        :obj="rulesClass"
+        :episode="ruleEpisode"
+        :rule-episode="searchClass.withUserOffset(ruleEpisode)"
+        :season="syncPage.curState?.season"
+        :initial-rule-set="searchClass.getRuleSetSelection()"
+        :auto-rule-set="searchClass.getAutoRuleSet()"
+        @ruleset="setRuleSet"
+      ></rules>
 
-      <input-button v-if="!syncMode" label="URL" :state="searchClass.getUrl()" @clicked="setPage"></input-button>
+      <input-button
+        v-if="!syncMode"
+        label="URL"
+        :state="searchClass.getUrl()"
+        @clicked="setPage"
+      ></input-button>
 
       <input-button
         v-if="!syncMode"
@@ -17,10 +44,10 @@
         :state="offset"
         type="number"
         @clicked="setOffset"
-        @change="val => (inputOffset = val)"
+        @changed="val => (inputOffset = val)"
       ></input-button>
       <div v-if="inputOffset && inputOffset !== '0'" id="offsetUi">
-        <div v-for="index in 5" :key="index" class="offsetBox">
+        <div v-for="index in episodeWindow" :key="index" class="offsetBox">
           <div class="mdl-color--primary top">{{ index }}</div>
           <div
             class="bottom"
@@ -42,22 +69,26 @@
       </div>
 
       <search
-        :keyword="searchClass.getSanitizedTitel()"
+        :keyword="searchClass.getSanitizedTitle()"
         :type="searchClass.getNormalizedType()"
         :sync-mode="syncMode"
         :current-id="searchClass.getId()"
         @clicked="setPage($event.url, $event.id)"
       ></search>
     </div>
-    <a v-if="!(syncMode && minimized)" class="close" @click="close()">{{ lang('close') }}</a>
+    <a v-if="!(automatic && minimized)" class="close" @click="close()">{{ lang('close') }}</a>
   </div>
 </template>
 
-<script type="text/javascript">
+<script lang="ts">
 import search from './components/search.vue';
 import inputButton from './components/inputButton.vue';
 import entry from './components/entry.vue';
 import rules from './components/rules.vue';
+import ruleConflict from './components/ruleConflict.vue';
+import { hideFloatbutton, showFloatbutton } from '../../floatbutton/init';
+import type { CorrectionMode } from './searchClass';
+import type { RuleSetType } from './rulesClass';
 
 export default {
   components: {
@@ -65,49 +96,83 @@ export default {
     inputButton,
     search,
     rules,
+    ruleConflict,
   },
   data: () => ({
-    inputOffset: 0,
+    inputOffset: 0 as number | '0',
     minimized: false,
+    mode: 'default' as CorrectionMode,
+    searchClass: null as any,
+    unmountFnc: () => {
+      // placeholder
+    },
   }),
   computed: {
-    searchClass() {
-      return this.$parent.searchClass;
+    syncMode() {
+      return this.mode === 'sync';
+    },
+    conflictMode() {
+      return this.mode === 'conflict';
+    },
+    automatic() {
+      return this.mode !== 'default';
     },
     syncPage() {
-      return this.$parent.searchClass.getSyncPage();
+      return this.searchClass ? this.searchClass.getSyncPage() : null;
     },
     rulesClass() {
       return this.searchClass.rules;
     },
     currentStateEp() {
-      if (this.syncPage && this.syncPage.curState && this.syncPage.curState.episode) {
-        return this.syncPage.curState.episode;
+      if (this.syncPage && this.syncPage.curState && this.syncPage.curState.detectedEpisode) {
+        return this.syncPage.curState.detectedEpisode;
       }
-      return undefined;
-    },
-    syncMode() {
-      return this.$parent.syncMode;
+      return 1;
     },
     offset() {
       return this.searchClass.getOffset();
     },
+    ruleEpisode() {
+      return this.searchClass.getRuleEpisode(this.syncPage && this.syncPage.curState);
+    },
+    ruleConflict() {
+      const state = this.syncPage && this.syncPage.curState;
+      if (!this.rulesClass || !state || state.on !== 'SYNC') return undefined;
+      return this.searchClass.getRuleConflict(this.ruleEpisode, state.season);
+    },
+    episodeWindow() {
+      let start = this.currentStateEp + parseInt(this.inputOffset) - 2;
+      if (start < 1) start = 1;
+      return Array.from({ length: 5 }, (_, i) => i + start);
+    },
   },
   created() {
     this.minimized = api.settings.get('minimizeBigPopup');
+    if (api.settings.get('floatButtonCorrection')) hideFloatbutton(true);
+  },
+  unmounted() {
+    this.unmountFnc();
+    showFloatbutton();
   },
   methods: {
     lang: api.storage.lang,
     setPage(url, id = 0) {
       this.searchClass.setUrl(url, id);
-      utils.flashm(api.storage.lang('correction_NewUrl', [url]), false);
+      utils.flashm(api.storage.lang('correction_NewUrl', [url]));
       this.close();
     },
     setOffset(offset) {
       this.searchClass.setOffset(offset);
     },
+    setRuleSet(ruleSet) {
+      this.searchClass.setRuleSet(ruleSet);
+    },
+    async selectConflict(ruleSet: RuleSetType) {
+      await this.searchClass.setRuleSet(ruleSet);
+      this.close();
+    },
     close() {
-      this.$root.$destroy();
+      this.$.appContext.app.unmount();
     },
     calcEpOffset(ep) {
       return parseInt(ep) - parseInt(this.inputOffset);
@@ -115,3 +180,7 @@ export default {
   },
 };
 </script>
+
+<style lang="less">
+@import './correctionStyle.less';
+</style>

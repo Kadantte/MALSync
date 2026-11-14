@@ -1,17 +1,23 @@
 import { ListAbstract, listElement } from '../listAbstract';
+import { buildProviderUrl } from '../../utils/slugs';
 import * as helper from './helper';
+import * as definitions from '../definitions';
 
 export class UserList extends ListAbstract {
   name = 'MyAnimeList';
 
   authenticationUrl = helper.authenticationUrl;
 
-  async getUsername() {
+  async getUserObject() {
     return this.apiCall({
       type: 'GET',
       path: 'users/@me',
     }).then(json => {
-      return json.name;
+      return {
+        username: json.name,
+        picture: json.picture,
+        href: `https://myanimelist.net/profile/${json.name}`,
+      };
     });
   }
 
@@ -23,18 +29,23 @@ export class UserList extends ListAbstract {
     return [
       {
         icon: 'sort_by_alpha',
-        title: 'Alphabetic',
+        title: api.storage.lang('list_sorting_alpha'),
         value: 'alpha',
       },
       {
         icon: 'history',
-        title: 'Last Updated',
+        title: api.storage.lang('list_sorting_history'),
         value: 'updated',
       },
       {
         icon: 'score',
-        title: 'Score',
+        title: api.storage.lang('list_sorting_score'),
         value: 'score',
+      },
+      {
+        icon: 'calendar_month',
+        title: api.storage.lang('list_sorting_airing_date'),
+        value: 'airing_date',
       },
     ];
   }
@@ -47,9 +58,11 @@ export class UserList extends ListAbstract {
         return 'list_updated_at';
       case 'score':
         return 'list_score';
+      case 'airing_date':
+        return `${this.listType}_start_date`;
       default:
-        if (this.status === 1) return this.getOrder('updated');
-        if (this.status === 6) return this.getOrder('updated');
+        if (this.status === definitions.status.Watching) return this.getOrder('updated');
+        if (this.status === definitions.status.PlanToWatch) return this.getOrder('updated');
         return this.getOrder('alpha');
     }
   }
@@ -58,7 +71,7 @@ export class UserList extends ListAbstract {
 
   async getPart() {
     this.limit = 100;
-    if (this.modes.frontend) {
+    if (this.modes.frontend && !this.modes.sortAiring) {
       this.limit = 24;
     }
 
@@ -77,7 +90,7 @@ export class UserList extends ListAbstract {
     );
 
     let curSt = '';
-    if (this.status !== 7) {
+    if (this.status !== definitions.status.All) {
       if (this.listType === 'manga') {
         curSt = `&status=${helper.mangaStatus[this.status]}`;
       } else {
@@ -85,14 +98,17 @@ export class UserList extends ListAbstract {
       }
     }
 
+    const useAltTitle = api.settings.get('forceEnglishTitles');
+
     return this.apiCall({
       type: 'GET',
       path: `users/@me/${this.listType}list?nsfw=true&limit=${this.limit}&offset=${this.offset}${curSt}${sorting}`,
       fields: [
-        'list_status{tags,is_rewatching,is_rereading,start_date,finish_date}',
+        'list_status{tags,is_rewatching,is_rereading,start_date,finish_date,num_times_rewatched,num_times_reread}',
         'num_episodes',
         'num_chapters',
         'num_volumes',
+        useAltTitle ? 'alternative_titles' : '',
       ],
     }).then(json => {
       if (json.paging && json.paging.next) {
@@ -107,6 +123,7 @@ export class UserList extends ListAbstract {
 
   public async prepareData(data): Promise<listElement[]> {
     const newData = [] as listElement[];
+    const useAltTitle = api.settings.get('forceEnglishTitles');
     for (let i = 0; i < data.length; i++) {
       const el = data[i];
       if (this.listType === 'anime') {
@@ -117,13 +134,17 @@ export class UserList extends ListAbstract {
             apiCacheKey: el.node.id,
             cacheKey: el.node.id,
             type: this.listType,
-            title: el.node.title,
-            url: `https://myanimelist.net/${this.listType}/${el.node.id}`,
+            title: useAltTitle ? el.node.alternative_titles.en || el.node.title : el.node.title,
+            url: buildProviderUrl('MAL', this.listType, el.node.id),
+            score: el.list_status.score,
             watchedEp: el.list_status.num_episodes_watched,
             totalEp: el.node.num_episodes,
             status: parseInt(helper.animeStatus[el.list_status.status]),
-            score: el.list_status.score,
+            startDate: helper.getRoundedDate(el.list_status.start_date),
+            finishDate: helper.getRoundedDate(el.list_status.finish_date),
+            rewatchCount: el.list_status.num_times_rewatched,
             image: el.node.main_picture?.medium ?? '',
+            imageLarge: el.node.main_picture?.large || el.node.main_picture?.medium || '',
             tags: el.list_status.tags.length ? el.list_status.tags.join(',') : '',
             airingState: el.anime_airing_status,
           }),
@@ -136,20 +157,25 @@ export class UserList extends ListAbstract {
             apiCacheKey: el.node.id,
             cacheKey: el.node.id,
             type: this.listType,
-            title: el.node.title,
-            url: `https://myanimelist.net/${this.listType}/${el.node.id}`,
-            watchedEp: el.list_status.num_chapters_read,
-            totalEp: el.node.num_chapters,
-            status: parseInt(helper.mangaStatus[el.list_status.status]),
+            title: useAltTitle ? el.node.alternative_titles.en || el.node.title : el.node.title,
+            url: buildProviderUrl('MAL', this.listType, el.node.id),
             score: el.list_status.score,
+            watchedEp: el.list_status.num_chapters_read,
+            readVol: el.list_status.num_volumes_read,
+            totalEp: el.node.num_chapters,
+            totalVol: el.node.num_volumes,
+            status: parseInt(helper.mangaStatus[el.list_status.status]),
+            startDate: helper.getRoundedDate(el.list_status.start_date),
+            finishDate: helper.getRoundedDate(el.list_status.finish_date),
+            rewatchCount: el.list_status.num_times_reread,
             image: el.node.main_picture?.medium ?? '',
+            imageLarge: el.node.main_picture?.large || el.node.main_picture?.medium || '',
             tags: el.list_status.tags.length ? el.list_status.tags.join(',') : '',
             airingState: el.anime_airing_status,
           }),
         );
       }
     }
-    console.log(newData);
     return newData;
   }
 

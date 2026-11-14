@@ -2,7 +2,11 @@
   <div
     v-if="malObj"
     id="malsync-update-ui"
-    :class="{ 'malsync-loading': loading, 'malsync-error': errorMessage, 'malsync-not-list': !onList }"
+    :class="{
+      'malsync-loading': loading,
+      'malsync-error': errorMessage,
+      'malsync-not-list': !onList,
+    }"
   >
     <div class="ms-data">
       <div v-show="loading" class="ms-loading"></div>
@@ -10,29 +14,31 @@
         <span class="remove-update-mal-sync" @click="hide()">x</span>
         <scoreMode
           :label="lang('UI_Score')"
-          :value="score"
+          :value="score!"
           :score-mode-strategy="malObj ? malObj.getScoreMode() : null"
           @update:value="score = $event"
         ></scoreMode>
 
         <inputNumber
-          :label="utils.episode(malObj.getType())"
+          :label="utils.episode(malObj.getType() as 'anime' | 'manga')"
           :total="malObj.getTotalEpisodes()"
-          :value="episode"
+          :value="episode!"
           :additional-slot="Boolean(progress)"
           @update:value="episode = $event"
         >
-          <span v-if="progress" class="mal-sync-ep" :title="progress.getAutoText()">
-            [<span :style="`border-bottom: 1px dotted ${progress.getColor()};`">{{ progress.getCurrentEpisode() }}</span
+          <span v-if="progress" class="mal-sync-ep" :title="progress.progress()!.getAutoText()">
+            [<span :style="`border-bottom: 1px dotted ${progress.getColor()};`">{{
+              progress.progress()!.getCurrentEpisode()!
+            }}</span
             >]
           </span>
         </inputNumber>
 
         <inputNumber
-          v-if="malObj && malObj.type === 'manga' && onList"
+          v-if="malObj && malObj.getType() === 'manga' && onList"
           :label="lang('UI_Volume')"
           :total="malObj.getTotalVolumes()"
-          :value="volume"
+          :value="volume!"
           @update:value="volume = $event"
         />
 
@@ -41,20 +47,30 @@
         <span class="powered-malsync">Provided by MAL-Sync</span>
       </div>
 
-      <div v-if="!onList" class="malsync-add" :class="{ 'ms-load': loading || errorMessage }" @click="addUpdate()">
+      <div
+        v-if="!onList"
+        class="malsync-add"
+        :class="{ 'ms-load': loading || errorMessage }"
+        @click="addUpdate()"
+      >
         {{ lang('Add') }}
       </div>
-      <div v-else-if="malObj.isDirty() && !loading && !errorMessage" class="malsync-save" @click="update()">
+      <div
+        v-else-if="malObj.isDirty() && !loading && !errorMessage"
+        class="malsync-save"
+        @click="update()"
+      >
         {{ lang('Update') }}
       </div>
     </div>
   </div>
 </template>
 
-<script type="text/javascript">
+<script lang="ts">
 import inputNumber from './input-number.vue';
 import scoreMode from './score-mode.vue';
 import { status } from '../_provider/definitions';
+import { SingleAbstract } from '../_provider/singleAbstract';
 
 export default {
   components: {
@@ -64,7 +80,7 @@ export default {
   data: () => ({
     lang: api.storage.lang,
     utils,
-    malObj: null,
+    malObj: null as null | SingleAbstract,
     episode: null,
     score: null,
     volume: null,
@@ -82,13 +98,12 @@ export default {
       return this.malObj ? this.malObj.getVolume() : null;
     },
     progress() {
+      const malObj = this.malObj as SingleAbstract | null;
       if (
-        this.malObj &&
-        this.malObj.getProgress() &&
-        this.malObj.getProgress().isAiring() &&
-        this.malObj.getProgress().getCurrentEpisode()
+        malObj?.getProgress()?.isAiring() &&
+        malObj.getProgress()?.progress()?.getCurrentEpisode()
       ) {
-        return this.malObj.getProgress();
+        return malObj.getProgress()!;
       }
       return '';
     },
@@ -153,7 +168,8 @@ export default {
           else if (
             !oldValue &&
             newValue &&
-            (this.malObj.getStatus() === status.PlanToWatch || this.malObj.getStatus() === status.NoState)
+            (this.malObj.getStatus() === status.PlanToWatch ||
+              this.malObj.getStatus() === status.NoState)
           ) {
             this.malObj.setStatus(status.Watching);
             this.forceUpdateState = true;
@@ -172,7 +188,6 @@ export default {
       },
     },
   },
-  created() {},
   methods: {
     async reload() {
       if (this.malObj) {
@@ -210,7 +225,6 @@ export default {
       await this.update();
     },
     hide() {
-      this.$destroy();
       this.$el.remove();
       api.settings.set('anilistUpdateUi', false);
     },
@@ -402,7 +416,7 @@ export default {
     }
 
     @keyframes loading-mal {
-      from {
+      0% {
         left: -200px;
         width: 30%;
       }
@@ -418,7 +432,7 @@ export default {
       95% {
         left: 120%;
       }
-      to {
+      100% {
         left: 100%;
       }
     }

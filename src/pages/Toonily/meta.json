@@ -1,6 +1,0 @@
-{
-  "search": "https://toonily.net/?s={searchtermPlus}&post_type=wp-manga",
-  "urls": {
-    "match": ["*://toonily.net/manga/*"]
-  }
-}

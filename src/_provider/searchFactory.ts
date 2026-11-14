@@ -3,9 +3,18 @@ import { search as malSearch } from './MyAnimeList_hybrid/search';
 import { search as malApiSearch } from './MyAnimeList_api/search';
 import { search as aniSearch } from './AniList/search';
 import { search as kitsuSearch } from './Kitsu/search';
+import { search as mangaBakaSearch } from './MangaBaka/search';
 import { search as simklSearch } from './Simkl/search';
+import { search as shikiSearch } from './Shikimori/search';
+import { search as oshiSearch } from './AnimeOshi/search';
 
-export function search(keyword, type: 'anime' | 'manga', options = {}, sync = false, syncMode = '') {
+export function search(
+  keyword,
+  type: 'anime' | 'manga',
+  options = {},
+  sync = false,
+  syncMode = '',
+) {
   if (!syncMode) {
     syncMode = helper.getSyncMode(type);
   }
@@ -16,8 +25,17 @@ export function search(keyword, type: 'anime' | 'manga', options = {}, sync = fa
   if (syncMode === 'ANILIST') {
     return aniSearch(keyword, type, options, sync);
   }
+  if (syncMode === 'MANGABAKA') {
+    return mangaBakaSearch(keyword, type, options, sync);
+  }
   if (syncMode === 'SIMKL') {
     return simklSearch(keyword, type, options, sync);
+  }
+  if (syncMode === 'SHIKI') {
+    return shikiSearch(keyword, type, options, sync);
+  }
+  if (syncMode === 'ANIMEOSHI') {
+    return oshiSearch(keyword, type, options, sync);
   }
   if (syncMode === 'MALAPI') {
     return malApiSearch(keyword, type, options, sync);

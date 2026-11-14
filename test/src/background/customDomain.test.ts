@@ -1,26 +1,27 @@
+import { expect } from 'chai';
+
 // Disable test because of import error
 return;
 
-import { expect } from 'chai';
 import * as Api from '../utils/apiStub';
 Api.setGlobals();
 
 const manifest = require('../../../dist/webextension/manifest.json');
-import { cleanupCustomDomains } from '../../../src/background/customDomain'
+import { cleanupCustomDomains} from '../../../src/background/customDomain';
 
-describe('Custom Domain', function() {
-  before(function() {
+describe('Custom Domain', function () {
+  before(function () {
     Api.setGlobals();
     global.chrome = {
       runtime: {
         getManifest: function () {
           return manifest;
-        }
-      }
-    }
+        },
+      },
+    };
   });
 
-  describe('CleanUp', function() {
+  describe('CleanUp', function () {
     before(function () {
       const stub = Api.getStub({
         settings: {
@@ -46,8 +47,8 @@ describe('Custom Domain', function() {
         },
       });
       Api.setStub(stub);
-    })
-    it('Cleanup', async function() {
+    });
+    it('Cleanup', async function () {
       await cleanupCustomDomains();
       //@ts-ignore
       expect(api.settings.get('customDomains')).to.deep.equal(
@@ -61,7 +62,5 @@ describe('Custom Domain', function() {
         }),
       );
     });
-  })
-
-})
-
+  });
+});

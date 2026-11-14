@@ -1,6 +1,6 @@
 setGlobals();
 import { expect } from 'chai';
-import * as sync from '../../../../src/minimal/minimalApp/listSync/syncHandler';
+import * as sync from '../../../../src/utils/syncHandler';
 import * as Api from '../../utils/apiStub';
 
 function setGlobals() {
@@ -17,10 +17,13 @@ const helper = {
       type: 'anime',
       uid: 22,
       malId: 19815,
+      score: 6,
       watchedEp: 15,
       totalEp: 24,
       status: 6,
-      score: 6,
+      startDate: null,
+      finishDate: null,
+      rewatchCount: 0,
       diff: {},
       url: 'https://myanimelist.net/anime/19815',
     };
@@ -32,7 +35,7 @@ const helper = {
       slaves: [helper.getItem(), helper.getItem()],
     };
 
-    el.slaves[0].url = 'https://kitsu.io/anime/no-game-no-life';
+    el.slaves[0].url = 'https://kitsu.app/anime/no-game-no-life';
     el.slaves[1].url = 'https://anilist.co/anime/19815/No-Game-No-Life/';
     return el;
   },
@@ -50,10 +53,19 @@ describe('Sync Handling', function() {
       expect(sync.getType('https://anilist.co/anime/19815/No-Game-No-Life/')).to.equal('ANILIST');
     });
     it('Kitsu', function() {
-      expect(sync.getType('https://kitsu.io/anime/no-game-no-life')).to.equal('KITSU');
+      expect(sync.getType('https://kitsu.app/anime/no-game-no-life')).to.equal('KITSU');
+    });
+    it('AnimeOshi', function() {
+      expect(sync.getType('https://www.animeoshi.com/anime/no-game-no-life')).to.equal('ANIMEOSHI');
     });
     it('Simkl', function() {
       expect(sync.getType('https://simkl.com/anime/46128/no-game-no-life')).to.equal('SIMKL');
+    });
+    it('Shiki', function() {
+      expect(sync.getType('https://shikimori.one/animes/z19815-no-game-no-life')).to.equal('SHIKI');
+    });
+    it('Shiki', function () {
+      expect(sync.getType('https://shikimori.io/animes/z19815-no-game-no-life')).to.equal('SHIKI');
     });
     it('Random', function() {
       expect(() => sync.getType('Random')).to.throw();
@@ -96,6 +108,16 @@ describe('Sync Handling', function() {
       expect(item.slaves[1].diff).to.deep.equal(diff);
     });
 
+    it('Score Change', function() {
+      const item = helper.getMasterSlave();
+      item.master.score = 2;
+      const diff = { score: 2 };
+      sync.changeCheck(item, mode);
+      expect(item.diff).to.equal(true);
+      expect(item.slaves[0].diff).to.deep.equal(diff);
+      expect(item.slaves[1].diff).to.deep.equal(diff);
+    });
+
     it('Episode Change', function() {
       const item = helper.getMasterSlave();
       item.master.watchedEp = 22;
@@ -116,10 +138,32 @@ describe('Sync Handling', function() {
       expect(item.slaves[1].diff).to.deep.equal(diff);
     });
 
-    it('Score Change', function() {
+    it('Start Date Change', function() {
       const item = helper.getMasterSlave();
-      item.master.score = 2;
-      const diff = { score: 2 };
+      // @ts-ignore
+      item.master.startDate = '1970-01-01';
+      const diff = { startDate: '1970-01-01' };
+      sync.changeCheck(item, mode);
+      expect(item.diff).to.equal(true);
+      expect(item.slaves[0].diff).to.deep.equal(diff);
+      expect(item.slaves[1].diff).to.deep.equal(diff);
+    });
+
+    it('Finish Date Change', function() {
+      const item = helper.getMasterSlave();
+      // @ts-ignore
+      item.master.finishDate = '1970-01-01';
+      const diff = { finishDate: '1970-01-01' };
+      sync.changeCheck(item, mode);
+      expect(item.diff).to.equal(true);
+      expect(item.slaves[0].diff).to.deep.equal(diff);
+      expect(item.slaves[1].diff).to.deep.equal(diff);
+    });
+
+    it('Rewatch Count Change', function() {
+      const item = helper.getMasterSlave();
+      item.master.rewatchCount = 2;
+      const diff = { rewatchCount: 2 };
       sync.changeCheck(item, mode);
       expect(item.diff).to.equal(true);
       expect(item.slaves[0].diff).to.deep.equal(diff);
@@ -166,7 +210,6 @@ describe('Sync Handling', function() {
       res.error = null;
       delete res.diff;
       delete res.totalEp;
-      delete res.type;
       delete res.uid;
 
       sync.missingCheck(item, miss, typeArray, mode);
@@ -182,7 +225,6 @@ describe('Sync Handling', function() {
       res.error = null;
       delete res.diff;
       delete res.totalEp;
-      delete res.type;
       delete res.uid;
 
       delete item.master;
@@ -237,16 +279,19 @@ describe('Sync Handling', function() {
       mal: 'mal',
       anilist: 'anilist',
       kitsu: 'kitsu',
+      mangabaka: 'mangabaka',
       simkl: 'simkl',
+      shiki: 'shiki',
+      animeoshi: 'animeoshi',
     });
     it('providerType', function() {
       for (const i in providerList) {
-        expect(providerList[i].providerType).to.be.oneOf(['MAL', 'ANILIST', 'KITSU', 'SIMKL']);
+        expect(providerList[i].providerType).to.be.oneOf(['MAL', 'ANILIST', 'KITSU', 'MANGABAKA', 'SIMKL', 'SHIKI', 'ANIMEOSHI']);
       }
     });
     it('providerSettings', function() {
       for (const i in providerList) {
-        expect(providerList[i].providerSettings).to.be.oneOf(['mal', 'anilist', 'kitsu', 'simkl']);
+        expect(providerList[i].providerSettings).to.be.oneOf(['mal', 'anilist', 'kitsu', 'mangabaka', 'simkl', 'shiki', 'animeoshi']);
       }
     });
   });
@@ -269,11 +314,26 @@ describe('Sync Handling', function() {
           list: null,
           master: false,
         },
+        mangabaka: {
+          text: 'Init',
+          list: null,
+          master: false,
+        },
         simkl: {
           text: 'Init',
           list: null,
           master: false,
         },
+        shiki: {
+          text: 'Init',
+          list: null,
+          master: false,
+        },
+        animeoshi: {
+          text: 'Init',
+          list: null,
+          master: false,
+        }
       });
 
       for (const i in providerList) {
@@ -293,6 +353,8 @@ describe('Sync Handling', function() {
       const stub = Api.getStub({
         settings: {
           syncMode: 'MAL',
+          syncModeSimkl: 'MAL',
+          splitTracking: false,
         },
       });
       Api.setStub(stub);
@@ -303,13 +365,15 @@ describe('Sync Handling', function() {
       expect(res.master).equal('MAL');
       expect(res.slaves).to.not.include('MAL');
       expect(res.slaves).to.have.length(res.typeArray.length - 1);
-      expect(res.typeArray).to.deep.equal(['MAL', 'ANILIST', 'KITSU', 'SIMKL']);
+      expect(res.typeArray).to.deep.equal(['MAL', 'ANILIST', 'KITSU', 'MANGABAKA', 'SIMKL', 'SHIKI', 'ANIMEOSHI']);
     });
 
     it('ANILIST Master', async function() {
       const stub = Api.getStub({
         settings: {
           syncMode: 'ANILIST',
+          syncModeSimkl: 'ANILIST',
+          splitTracking: false,
         },
       });
       Api.setStub(stub);
@@ -326,6 +390,8 @@ describe('Sync Handling', function() {
       const stub = Api.getStub({
         settings: {
           syncMode: 'KITSU',
+          syncModeSimkl: 'KITSU',
+          splitTracking: false,
         },
       });
       Api.setStub(stub);
@@ -341,6 +407,8 @@ describe('Sync Handling', function() {
       const stub = Api.getStub({
         settings: {
           syncMode: 'SIMKL',
+          syncModeSimkl: 'MAL',
+          splitTracking: false,
         },
       });
       Api.setStub(stub);
@@ -358,6 +426,7 @@ describe('Sync Handling', function() {
         settings: {
           syncMode: 'SIMKL',
           syncModeSimkl: 'MAL',
+          splitTracking: false,
         },
       });
       Api.setStub(stub);
@@ -369,6 +438,41 @@ describe('Sync Handling', function() {
       expect(res.slaves).to.have.length(res.typeArray.length - 1);
       expect(res.slaves).to.not.include('MAL');
     });
+
+    it('SHIKI Master', async function() {
+      const stub = Api.getStub({
+        settings: {
+          syncMode: 'SHIKI',
+          syncModeSimkl: 'SHIKI',
+          splitTracking: false,
+        },
+      });
+      Api.setStub(stub);
+      const providerList = getProviderListList();
+      const res = await sync.retriveLists(providerList, 'anime', getListStub);
+
+      expect(res.master).equal('SHIKI');
+      expect(res.slaves).to.have.length(res.typeArray.length - 1);
+      expect(res.slaves).to.not.include('SHIKI');
+    });
+
+    it('MANGABAKA Master', async function () {
+      const stub = Api.getStub({
+        settings: {
+          syncMode: 'MANGABAKA',
+          syncModeSimkl: 'MAL',
+          splitTracking: false,
+        },
+      });
+      Api.setStub(stub);
+      const providerList = getProviderListList();
+      const res = await sync.retriveLists(providerList, 'manga', getListStub);
+
+      expect(res.master).equal('MANGABAKA');
+      expect(res.slaves).to.have.length(res.typeArray.length - 1);
+      expect(res.slaves).to.not.include('MANGABAKA');
+    });
+
 
     it('typeArray', async function() {
       getListStub = (prov, type) => {
@@ -384,6 +488,8 @@ describe('Sync Handling', function() {
       const stub = Api.getStub({
         settings: {
           syncMode: 'MAL',
+          syncModeSimkl: 'MAL',
+          splitTracking: false,
         },
       });
       Api.setStub(stub);
@@ -391,7 +497,7 @@ describe('Sync Handling', function() {
       const providerList = getProviderListList();
       const res = await sync.retriveLists(providerList, 'anime', getListStub);
 
-      expect(res.typeArray).to.deep.equal(['MAL', 'ANILIST', 'SIMKL']);
+      expect(res.typeArray).to.deep.equal(['MAL', 'ANILIST', 'MANGABAKA', 'SIMKL', 'SHIKI', 'ANIMEOSHI']);
     });
   });
 });

@@ -1,26 +1,48 @@
-import { mal } from './MyAnimeList/templates';
-import { anilist } from './AniList/templates';
-import { kitsu } from './Kitsu/templates';
-import { simkl } from './Simkl/templates';
-import { local } from './Local/templates';
+import { getSyncMode } from '../_provider/helper';
 
-function getSyncMode() {
-  return api.settings.get('syncMode');
-}
-
-export function providerTemplates(malUrl?) {
-  if (/^local:\/\//i.test(malUrl)) {
-    return local;
+export function providerTemplates(type: 'anime' | 'manga', malUrl?: string) {
+  if (malUrl && /^local:\/\//i.test(malUrl)) {
+    return {
+      shortName: 'local storage',
+    };
   }
-  const syncMode = getSyncMode();
+  const syncMode = getSyncMode(type);
   if (syncMode === 'MAL' || syncMode === 'MALAPI') {
-    return mal;
+    return {
+      shortName: 'MAL',
+    };
   }
   if (syncMode === 'ANILIST') {
-    return anilist;
+    return {
+      shortName: 'AniList',
+    };
   }
   if (syncMode === 'KITSU') {
-    return kitsu;
+    return {
+      shortName: 'Kitsu',
+    };
   }
-  return simkl;
+  if (syncMode === 'SHIKI') {
+    return {
+      shortName: 'Shiki',
+    };
+  }
+  if (syncMode === 'SIMKL') {
+    return {
+      shortName: 'Simkl',
+    };
+  }
+  if (syncMode === 'MANGABAKA') {
+    return {
+      shortName: 'MangaBaka',
+    };
+  }
+  if (syncMode === 'ANIMEOSHI') {
+    return {
+      shortName: 'AnimeOshi',
+    };
+  }
+  return {
+    shortName: 'Page',
+  };
 }

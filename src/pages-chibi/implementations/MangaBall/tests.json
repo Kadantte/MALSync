@@ -1,0 +1,56 @@
+{
+  "title": "MangaBall",
+  "url": "https://mangaball.com",
+  "testCases": [
+    {
+      "url": "https://mangaball.com/chapter-detail/689b2ee2aafdff27c6331c8a/",
+      "expected": {
+        "sync": true,
+        "title": "Ren'ai Shikou Seitokai",
+        "identifier": "685232aebec3a4d08474ae43",
+        "image": "https://uploads.mangadex.org/covers/49ea927c-47ca-4d56-b7bf-b64cd860fd8a/2a5732ea-74ac-42c8-a562-09a7a1fb4a6b.jpg",
+        "overviewUrl": "https://mangaball.com/title-detail/685232aebec3a4d08474ae43",
+        "episode": 10,
+        "uiSelector": false
+      }
+    },
+    {
+      "url": "https://mangaball.com/title-detail/renai-shikou-seitokai-685232aebec3a4d08474ae43/",
+      "expected": {
+        "sync": false,
+        "title": "Ren'ai Shikou Seitokai",
+        "identifier": "685232aebec3a4d08474ae43",
+        "image": "https://bulbasaur.poke-black-and-white.net/covers/685232aebec3a4d08474ae43/cover_1754765227253.jpg",
+        "uiSelector": true,
+        "epList": {
+          "24": "https://mangaball.com/chapter-detail/69949a1e009699b10eac4eb7?chapter=24",
+          "25": "https://mangaball.com/chapter-detail/69949a1e009699b10eac4eb6?chapter=25"
+        }
+      }
+    },
+    {
+      "url": "https://mangaball.com/chapter-detail/68532ef26c8186610afe2d41/",
+      "expected": {
+        "sync": true,
+        "title": "Reki Yomi",
+        "identifier": "685273f26908629fc2c82a06",
+        "image": "https://uploads.mangadex.org/covers/a971a398-192c-457d-b803-78b029fb3c7f/589b729a-48c9-48e7-8914-2aa4a29a2246.jpg",
+        "overviewUrl": "https://mangaball.com/title-detail/685273f26908629fc2c82a06",
+        "episode": 26,
+        "uiSelector": false
+      }
+    },
+    {
+      "url": "https://mangaball.com/chapter-detail/68d573527a50a90a6f0348f6/",
+      "expected": {
+        "sync": true,
+        "title": "The Greatest Estate Developer",
+        "identifier": "685155de702284f8341785f8",
+        "image": "https://uploads.mangadex.org/covers/d7f56ace-cd30-48b9-8b64-afeca0077fca/c2613a1e-426f-4ee3-a6f7-caf003324dc7.jpg",
+        "overviewUrl": "https://mangaball.com/title-detail/685155de702284f8341785f8",
+        "episode": 210,
+        "uiSelector": false
+      }
+    }
+  ]
+}

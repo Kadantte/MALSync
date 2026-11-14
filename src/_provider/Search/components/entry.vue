@@ -1,6 +1,6 @@
 <template>
   <div v-if="obj" class="entry">
-    <a class="result" :href="obj.getDisplayUrl()" target="_blank" style="cursor: pointer;">
+    <a class="result" :href="obj.getDisplayUrl()" target="_blank" style="cursor: pointer">
       <div class="image"><img v-if="obj.getImage()" :src="obj.getImage()" /></div>
       <div class="right">
         <span class="title">{{ obj.getTitle() }}</span>
@@ -16,7 +16,9 @@
   </div>
 </template>
 
-<script type="text/javascript">
+<script lang="ts">
+import { status } from '../../definitions';
+
 export default {
   props: {
     obj: {
@@ -88,18 +90,20 @@ export default {
     utilsepisode: utils.episode,
     statusText(state) {
       switch (state) {
-        case 1:
+        case status.Watching:
           return api.storage.lang(`UI_Status_watching_${this.obj.getType()}`);
-        case 2:
+        case status.Completed:
           return api.storage.lang('UI_Status_Completed');
-        case 3:
+        case status.Onhold:
           return api.storage.lang('UI_Status_OnHold');
-        case 4:
+        case status.Dropped:
           return api.storage.lang('UI_Status_Dropped');
-        case 6:
+        case status.PlanToWatch:
           return api.storage.lang(`UI_Status_planTo_${this.obj.getType()}`);
-        case 23:
+        case status.Rewatching:
           return api.storage.lang(`UI_Status_Rewatching_${this.obj.getType()}`);
+        case status.Considering:
+          return api.storage.lang('UI_Status_Considering');
         default:
           return '';
       }

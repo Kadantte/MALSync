@@ -1,0 +1,69 @@
+{
+  "title": "GaiaFlix",
+  "url": "https://gaiaflix.live",
+  "testCases": [
+    {
+      "url": "https://gaiaflix.live/#/watch/anime/99147?season=1&episode=2&dub=sub",
+      "expected": {
+        "sync": true,
+        "title": "Attack on Titan Season 3",
+        "identifier": "anilist-99147",
+        "overviewUrl": "https://gaiaflix.live/#/watch/anime/99147?season=1&episode=1&dub=sub",
+        "episode": 2,
+        "uiSelector": false
+      }
+    },
+    {
+      "url": "https://gaiaflix.live/#/anime-title/attack-on-titan-season-3-s4cl5?q=Attack%20on%20Titan",
+      "expected": {
+        "sync": false,
+        "title": "Attack on Titan Season 3",
+        "identifier": "anilist-99147",
+        "image": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx99147-AiPDD8cwlCfi.jpg",
+        "uiSelector": true,
+        "epList": {
+          "2": "https://gaiaflix.live/#/watch/anime/99147?season=1&episode=2&dub=sub",
+          "6": "https://gaiaflix.live/#/watch/anime/99147?season=1&episode=6&dub=sub"
+        }
+      }
+    },
+    {
+      "url": "https://gaiaflix.live/#/detail/tv/1429",
+      "expected": {
+        "sync": false,
+        "title": "Attack on Titan",
+        "identifier": "anilist-16498",
+        "image": "https://image.tmdb.org/t/p/w500/hTP1DtLGFamjfu8WqjnuQdP1n4i.jpg",
+        "uiSelector": true,
+        "epList": {
+          "2": "https://gaiaflix.live/#/watch/anime/16498?season=1&episode=2&dub=sub",
+          "6": "https://gaiaflix.live/#/watch/anime/16498?season=1&episode=6&dub=sub"
+        }
+      }
+    },
+    {
+      "url": "https://gaiaflix.live/#/detail/tv/94664",
+      "expected": {
+        "sync": false,
+        "title": "Mushoku Tensei: Jobless Reincarnation",
+        "identifier": "anilist-108465",
+        "image": "https://image.tmdb.org/t/p/w500/gLKOYIMyKlUHW0SVdskhgf9C0yy.jpg",
+        "uiSelector": true,
+        "epList": {
+          "2": "https://gaiaflix.live/#/watch/anime/108465?season=1&episode=2&dub=sub",
+          "11": "https://gaiaflix.live/#/watch/anime/108465?season=1&episode=11&dub=sub"
+        }
+      }
+    },
+    {
+      "url": "https://gaiaflix.live/#/detail/movie/1575337",
+      "expected": {
+        "sync": false,
+        "title": "Cosmic Princess Kaguya!",
+        "identifier": "1575337",
+        "image": "https://image.tmdb.org/t/p/w500/9I9cM38gecZcwJ0C6r0cwfvtPJP.jpg",
+        "uiSelector": true
+      }
+    }
+  ]
+}

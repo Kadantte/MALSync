@@ -3,17 +3,14 @@ const extra = require('fs-extra');
 const fs = require('fs');
 const pagesMain = require('./utils/pagesMain');
 
-const pages = Object.values(pagesMain.pages());
+const allPages = {
+  ...pagesMain.pages(),
+  ...pagesMain.chibi(),
+}
+
+const pages = Object.values(allPages);
 
 pages.sort(function(a, b) {
-  const textA = a.name.toUpperCase();
-  const textB = b.name.toUpperCase();
-  return textA < textB ? -1 : textA > textB ? 1 : 0;
-});
-
-const hpages = Object.values(pagesMain.pages('../../src/pages-adult/pages.ts'));
-
-hpages.sort(function(a, b) {
   const textA = a.name.toUpperCase();
   const textB = b.name.toUpperCase();
   return textA < textB ? -1 : textA > textB ? 1 : 0;
@@ -54,7 +51,7 @@ function createTable() {
         <th>Overview Page</th>
         <th>Next Episode</th>
         <th>Database Support</th>
-        <th>Update Check</th>
+        <th>Episode Highlight</th>
       </tr>
     </thead>
     <tbody>
@@ -70,7 +67,7 @@ function createTable() {
         <th>Overview Page</th>
         <th>Next Chapter</th>
         <th>Database Support</th>
-        <th>Update Check</th>
+        <th>Chapter Higlight</th>
       </tr>
     </thead>
     <tbody>
@@ -94,6 +91,7 @@ function createTable() {
 
 adultDep();
 function adultDep() {
+  const hpages = pagesMain.adult();
   let html = `
   <table>
     <tbody>
@@ -113,13 +111,16 @@ function adultDep() {
   `;
 
   const descFile = path.join(__dirname, '../src/pages-adult/README.md');
-  fs.readFile(descFile, 'utf8', function(err, data) {
+  fs.readFile(descFile, 'utf8', function (err, data) {
     if (err) {
       return console.log(err);
     }
-    const result = data.replace(/<!--pages-->((.|\n|\r)*)<!--\/pages-->/g, `<!--pages-->${html}<!--/pages-->`);
+    const result = data.replace(
+      /<!--pages-->((.|\n|\r)*)<!--\/pages-->/g,
+      `<!--pages-->${html}<!--/pages-->`,
+    );
 
-    fs.writeFile(descFile, result, 'utf8', function(err) {
+    fs.writeFile(descFile, result, 'utf8', function (err) {
       if (err) return console.log(err);
     });
   });
@@ -127,15 +128,17 @@ function adultDep() {
 
 readMe();
 function readMe() {
-  const pageList = Object.values(pagesMain.pages());
+  const pageList = Object.values(pages);
 
   const animes = [];
   const mangas = [];
   const medias = [
-    '<a href="http://app.emby.media"><img src="https://favicon.malsync.moe/?domain=app.emby.media"></a> <a href="http://app.emby.media">Emby</a> <a href="https://github.com/MALSync/MALSync/wiki/Emby-Plex">[Wiki]</a>',
-    '<a href="http://app.plex.tv"><img src="https://favicon.malsync.moe/?domain=http://app.plex.tv"></a> <a href="http://app.plex.tv">Plex</a> <a href="https://github.com/MALSync/MALSync/wiki/Emby-Plex">[Wiki]</a>',
-    '<a href="https://jellyfin.org/"><img src="https://favicon.malsync.moe/?domain=https://jellyfin.org/"></a> <a href="https://jellyfin.org/">Jellyfin</a> <a href="https://github.com/MALSync/MALSync/wiki/Emby-Plex">[Wiki]</a>',
-    '<a href="https://komga.org/"><img src="https://favicon.malsync.moe/?domain=https://komga.org/"></a> <a href="https://komga.org/">Komga</a> <a href="https://github.com/MALSync/MALSync/wiki/Emby-Plex">[Wiki]</a>',
+    '<a href="http://app.emby.media"><img src="https://favicon.malsync.moe/?domain=app.emby.media"></a> <a href="http://app.emby.media">Emby</a> <a href="https://github.com/MALSync/MALSync/wiki/Emby-Plex#emby">[Wiki]</a>',
+    '<a href="http://app.plex.tv"><img src="https://favicon.malsync.moe/?domain=http://app.plex.tv"></a> <a href="http://app.plex.tv">Plex</a> <a href="https://github.com/MALSync/MALSync/wiki/Emby-Plex#plex">[Wiki]</a>',
+    '<a href="https://jellyfin.org/"><img src="https://favicon.malsync.moe/?domain=https://jellyfin.org/"></a> <a href="https://jellyfin.org/">Jellyfin</a> <a href="https://github.com/MALSync/MALSync/wiki/Emby-Plex#jellyfin">[Wiki]</a>',
+    '<a href="https://komga.org/"><img src="https://favicon.malsync.moe/?domain=https://komga.org/"></a> <a href="https://komga.org/">Komga</a> <a href="https://github.com/MALSync/MALSync/wiki/Emby-Plex#komga">[Wiki]</a>',
+    '<a href="https://suwayomi.org/"><img src="https://favicon.malsync.moe/?domain=https://suwayomi-webui-preview.github.io/"></a> <a href="https://suwayomi.org/">Suwayomi</a> <a href="https://github.com/MALSync/MALSync/wiki/Emby-Plex#suwayomi">[Wiki]</a>',
+    '<a href="https://www.kavitareader.com/"><img src="https://favicon.malsync.moe/?domain=https://www.kavitareader.com/"></a> <a href="https://www.kavitareader.com/">Kavita</a> <a href="https://github.com/MALSync/MALSync/wiki/Emby-Plex#kavita">[Wiki]</a>',
   ];
 
   for (var page in pageList) {
@@ -145,7 +148,7 @@ function readMe() {
 
     const str = `<a href="${page.domain}"><img src="https://favicon.malsync.moe/?domain=${page.domain}"> ${page.name}</a>`;
 
-    if (page.name === 'Emby' || page.name === 'Plex' || page.name === 'Jellyfin' || page.name === 'Komga') {
+    if (page.name === 'Emby' || page.name === 'Plex' || page.name === 'Jellyfin' || page.name === 'Komga' || page.name === 'Suwayomi' || page.name === 'Kavita') {
       continue;
     }
 
@@ -173,10 +176,11 @@ function readMe() {
     </thead>
     <tbody>
       `;
-  for (var page in animes) {
+  for (var page in animes.length >= mangas.length ? animes : mangas) {
     anime = animes[page];
     manga = mangas[page];
     media = medias[page];
+    if (typeof anime === 'undefined') anime = '';
     if (typeof manga === 'undefined') manga = '';
     if (typeof media === 'undefined') media = '';
 
@@ -206,7 +210,7 @@ function readMe() {
 
 createJson();
 function createJson() {
-  const pageList = Object.values(pagesMain.pages());
+  const pageList = Object.values(allPages);
   const res = [];
   for (var page in pageList) {
     page = pageList[page];

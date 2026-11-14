@@ -1,8 +1,5 @@
 import { SimklClass } from '../simkl/simklClass';
 import { firebaseNotification } from '../utils/firebaseNotification';
-import { initShark } from '../utils/shark';
-
-initShark();
 
 let lastFocus;
 
@@ -12,7 +9,7 @@ function main() {
   messageSimklListener(simkl);
   firebaseNotification();
 
-  $(window).blur(function() {
+  $(window).blur(function () {
     lastFocus = Date.now();
   });
 }
@@ -25,20 +22,22 @@ api.settings.init().then(() => {
   main();
 });
 
-function messageSimklListener(simkl) {
+function messageSimklListener(simkl: SimklClass) {
   // @ts-ignore
-  chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
+  chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
     if (msg.action === 'TabMalUrl') {
       if (Date.now() - lastFocus < 3 * 1000) {
         con.info('miniMAL');
         simkl.getMalUrl().then(malUrl => {
-          if (malUrl !== '') {
-            con.log('TabMalUrl Message', malUrl);
-            sendResponse(malUrl);
-          } else if (api.settings.get('syncMode') === 'SIMKL') {
-            con.log('TabUrl Message', simkl.url);
-            sendResponse(simkl.url);
+          const res = {
+            url: malUrl,
+            image: simkl.getImage(),
+            title: simkl.getTitle(),
+          };
+          if (!malUrl && api.settings.get('syncMode') === 'SIMKL') {
+            res.url = simkl.url;
           }
+          sendResponse(res);
         });
         return true;
       }

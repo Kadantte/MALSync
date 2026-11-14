@@ -6,6 +6,13 @@ export class NotAutenticatedError extends Error {
   }
 }
 
+export class TokenExpiredError extends NotAutenticatedError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TokenExpiredError';
+  }
+}
+
 export class UrlNotSupportedError extends Error {
   constructor(message: string) {
     super(message);
@@ -38,7 +45,11 @@ export function parseJson(json) {
   try {
     return JSON.parse(json);
   } catch (e) {
-    throw new UnexpectedResponseError(e.message);
+    const text = String(json ?? '');
+    con.error('Response is not json', text);
+    if (!text.trim()) throw new UnexpectedResponseError('Empty response');
+    const title = text.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1]?.trim();
+    throw new UnexpectedResponseError(title || text.replace(/\s+/g, ' ').trim().slice(0, 200));
   }
 }
 
@@ -47,13 +58,13 @@ export function errorMessage(error, authenticationUrl: string) {
     return api.storage.lang('Error_Authenticate', [authenticationUrl]);
   }
   if (error instanceof ServerOfflineError) {
-    return `Server Offline`;
+    return 'Server Offline';
   }
   if (error instanceof UrlNotSupportedError) {
     return `Incorrect url provided [${error.message}]`;
   }
   if (error instanceof NotFoundError) {
-    return `Could not find this entry`;
+    return 'Could not find this entry';
   }
   return error.message;
 }
